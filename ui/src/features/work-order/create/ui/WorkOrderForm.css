@@ -1,0 +1,644 @@
+.wof-page {
+  padding: 20px 24px 28px;
+  background: #fff;
+}
+
+.wof-card {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+}
+
+.wof-errorCard {
+  margin-bottom: 18px;
+  padding: 16px 18px;
+  border: 1px solid #fecaca;
+  border-radius: 18px;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.wof-errorCard strong {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.wof-errorList {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+}
+
+.wof-fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+  display: grid;
+  gap: 14px;
+}
+
+.wof-grid3 {
+  display: grid;
+  gap: 12px;
+}
+
+.wof-field {
+  display: grid;
+  margin-top: 20px;
+  gap: 6px;
+}
+
+.wof-field span {
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.wof-form :is(select, textarea, input) {
+  min-height: 40px;
+  border-radius: 14px;
+  border: 1px solid #d7e0ea;
+  padding: 0 14px;
+  font-size: 0.95rem;
+  background: #fff;
+  color: #243247;
+  transition: opacity 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.wof-form :is(input, select, textarea):focus {
+  outline: none;
+  border-color: #547792;
+  box-shadow: 0 0 0 3px rgba(84, 119, 146, 0.12);
+}
+
+.wof-form :is(select:disabled, input:disabled, textarea:disabled) {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.wof-form textarea {
+  width: 100%;
+  min-height: 140px;
+  box-sizing: border-box;
+  resize: vertical;
+  padding: 14px;
+}
+
+.wof-box {
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  padding: 16px;
+  background: rgba(248, 250, 252, 0.75);
+}
+
+.wof-boxHeader,
+.wof-sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.wof-subtitle {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.wof-checkRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wof-checkRow input {
+  width: auto;
+  min-height: auto;
+}
+
+.wof-inputsSection {
+  display: grid;
+  gap: 10px;
+}
+
+.wof-splitList {
+  display: grid;
+  gap: 10px;
+}
+
+.wof-splitRow {
+  display: grid;
+  gap: 8px;
+}
+
+.wof-insumoGridHead {
+  display: none;
+}
+
+.wof-insumoRow {
+  display: grid;
+  gap: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 14px;
+  background: #fff;
+}
+
+.wof-primaryBtn,
+.wof-secondaryBtn,
+.wof-dangerBtn {
+  min-height: 40px;
+  border-radius: 14px;
+  border: none;
+  padding: 0 16px;
+  font-size: 15px;
+  color: #fff;
+  background: #3d5a6e;
+  cursor: pointer;
+  width: auto;
+  transition: opacity 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+
+.wof-primaryBtn:hover,
+.wof-secondaryBtn:hover,
+.wof-dangerBtn:hover {
+  transform: translateY(-1px);
+}
+
+.wof-secondaryBtn {
+  background: #547792;
+}
+
+.wof-dangerBtn {
+  background: #334155;
+}
+
+.wof-footerActions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.wof-inlineHint {
+  margin: 0;
+  color: #5f6c7b;
+  font-size: 0.95rem;
+}
+
+.wof-inlineError {
+  color: #b42318;
+  font-size: 0.95rem;
+}
+
+.wof-lotSelectorTrigger:focus-visible {
+  outline: none;
+  border-color: #7aa2ff;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+}
+
+.wof-lotSelectorTrigger:disabled {
+  background: #f8fafc;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.wof-lotSelectorField {
+  position: relative;
+}
+
+.wof-lotSelectorTrigger {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid #d8e1ec;
+  border-radius: 14px;
+  background: #fff;
+  color: #334155;
+  font: inherit;
+  text-align: left;
+  padding: 0.85rem 1rem;
+  cursor: pointer;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wof-summaryGrid {
+  display: grid;
+  gap: 12px;
+  align-items: start;
+}
+
+.wof-fixedField {
+  min-width: 0;
+  align-self: start;
+}
+
+.wof-fixedField input,
+.wof-fixedField select {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.wof-lotSelectorTrigger:hover:not(:disabled) {
+  border-color: #b8c6d8;
+}
+
+.wof-lotSelectorPopover {
+  position: absolute;
+  top: calc(100% + 0.55rem);
+  left: 0;
+  min-width: 200px;
+  z-index: 30;
+  border: 1px solid #d9e2ec;
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: 0 22px 44px rgba(15, 23, 42, 0.14);
+  padding: 1.25rem 1rem 1rem;
+}
+
+.wof-lotSelectorTitle {
+  margin: 0 0 0.85rem;
+  color: #44536a;
+  font-size: 0.9rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.wof-lotChecklist {
+  display: grid;
+  gap: 0.25rem;
+  max-height: 200px;
+  overflow-y: auto;
+  padding-right: 0.15rem;
+}
+
+.wof-lotOption {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  min-height: 18px;
+  padding: 0px 10px;
+  border-radius: 16px;
+  color: #50607a;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.wof-lotOption:hover {
+  background: #f7f9fc;
+}
+
+.wof-lotOption.is-selected {
+  background: #f4f7fb;
+}
+
+.wof-lotOption input[type='checkbox'] {
+  width: 18px !important;
+  height: 18px !important;
+  margin: 0;
+  accent-color: #3f5f7a;
+  flex: 0 0 auto;
+}
+
+.wof-lotOptionLabel {
+  flex: 1 1 auto;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wof-toast {
+  position: fixed;
+  top: 88px;
+  right: 24px;
+  z-index: 1000;
+  min-width: 320px;
+  max-width: 420px;
+  border-radius: 18px;
+  padding: 0.9rem 1rem;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.85rem;
+  border: 1px solid transparent;
+}
+
+.wof-toast.is-success {
+  background: #effaf3;
+  border-color: #b7e4c7;
+  color: #166534;
+}
+
+.wof-toast.is-error {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #991b1b;
+}
+
+.wof-toastContent {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.wof-toastContent strong {
+  font-size: 0.95rem;
+  line-height: 1.1;
+}
+
+.wof-toastContent span {
+  font-size: 0.94rem;
+  line-height: 1.35;
+}
+
+.wof-toastClose {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+
+.wof-lotAreaEditorCompact {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.wof-lotAreaChip {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 88px;
+  align-items: center;
+  gap: 8px;
+  padding: 0px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.wof-lotAreaChipName {
+  min-width: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #52637c;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wof-lotAreaEmpty {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  border: 1px dashed #d7e0ea;
+  border-radius: 12px;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.wof-supplySelectorCell {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.wof-pendingSupplyCard {
+  display: grid;
+  gap: 0.65rem;
+  margin: 0.75rem;
+  padding: 0.85rem;
+  border: 1px solid #dbe4ee;
+  border-radius: 14px;
+  background: #f8fbff;
+}
+
+.wof-pendingSupplyActions {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.wof-supplySelectorField {
+  position: relative;
+}
+
+.wof-supplySelectorTrigger {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid #d8e1ec;
+  border-radius: 16px;
+  background: #fff;
+  color: #334155;
+  font: inherit;
+  text-align: left;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.wof-supplySelectorTrigger:hover:not(:disabled) {
+  border-color: #b8c6d8;
+}
+
+.wof-supplySelectorTrigger:focus-visible {
+  outline: none;
+  border-color: #7aa2ff;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+}
+
+.wof-supplySelectorTrigger:disabled {
+  background: #f8fafc;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.wof-supplyTriggerValue {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+}
+
+.wof-supplyTriggerName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 700;
+  color: #111827;
+}
+
+.wof-supplyTriggerStock {
+  flex: 0 0 auto;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #9ca3af;
+}
+
+.wof-supplyTriggerStock.is-negative {
+  color: #ef4444;
+}
+
+.wof-supplyTriggerPlaceholder {
+  color: #9ca3af;
+}
+
+.wof-supplySelectorPopover {
+  position: absolute;
+  top: calc(100% + 0.75rem);
+  left: 0;
+  width: 300px;
+  z-index: 35;
+  border: 1px solid #d9e2ec;
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 20px 42px rgba(15, 23, 42, 0.14);
+  height: 300px;
+  overflow-y: auto;
+  padding-bottom: 0.5rem;
+}
+
+.wof-supplySearchInput {
+  width: calc(100% - 1.5rem);
+  margin: 0.75rem !important;
+  min-height: 44px !important;
+  border: 1px solid #d7dee8;
+  border-radius: 14px;
+  padding: 0.75rem 0.9rem;
+  font: inherit;
+  color: #334155;
+}
+
+.wof-supplyCreateAction {
+  width: 100%;
+  border: 0;
+  border-top: 1px solid #edf2f7;
+  border-bottom: 1px solid #edf2f7;
+  background: #fff;
+  color: #3b82f6;
+  font: inherit;
+  font-size: 0.98rem;
+  font-weight: 700;
+  text-align: left;
+  padding: 0.85rem 1.25rem;
+  cursor: pointer;
+}
+
+.wof-supplyOptionList {
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.wof-supplyOption {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid #edf2f7;
+  background: #fff;
+  text-align: left;
+  padding: 1rem 1.25rem;
+  cursor: pointer;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.wof-supplyOption:hover:not(:disabled) {
+  background: #f8fafc;
+}
+
+.wof-supplyOption:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.wof-supplyOptionName {
+  color: #111827;
+  font-size: 0.98rem;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.wof-supplyOptionStock {
+  flex: 0 0 auto;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #9ca3af;
+}
+
+.wof-supplyOptionStock.is-negative {
+  color: #ef4444;
+}
+
+@media (min-width: 640px) {
+
+  .wof-grid3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .wof-splitRow {
+    grid-template-columns: minmax(0, 2fr) minmax(120px, 1fr) auto;
+    align-items: center;
+  }
+
+  .wof-grid3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .wof-insumoGridHead {
+    display: grid;
+    grid-template-columns: 2fr 1.2fr 1.2fr 0.8fr;
+    gap: 8px;
+    font-weight: 600;
+    font-size: 0.92rem;
+    color: #334155;
+  }
+
+  .wof-insumoRow {
+    grid-template-columns: 2fr 1.2fr 1.2fr 0.8fr;
+    align-items: center;
+  }
+
+  .wof-actionsCol {
+    text-align: center;
+  }
+
+  .wof-summaryGrid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(260px, 0.9fr);
+    grid-template-areas:
+      'cultures surface lots'
+      'labor contractor lots';
+  }
+
+  .wof-summaryCultures {
+    grid-area: cultures;
+  }
+
+  .wof-summarySurface {
+    grid-area: surface;
+  }
+
+  .wof-summaryLots {
+    grid-area: lots;
+  }
+
+  .wof-summaryLabor {
+    grid-area: labor;
+  }
+
+  .wof-summaryContractor {
+    grid-area: contractor;
+  }
+
+}

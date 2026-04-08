@@ -1,0 +1,72 @@
+.work-order-drawer {
+  pointer-events: none;
+}
+
+.work-order-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.34);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.work-order-drawer-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: min(960px, 92vw);
+  height: 100vh;
+  background: #fff;
+  box-shadow: -24px 0 60px rgba(15, 23, 42, 0.18);
+  transform: translateX(100%);
+  transition: transform 0.24s ease;
+  display: grid;
+  grid-template-rows: auto 1fr;
+}
+
+.work-order-drawer.is-open {
+  pointer-events: auto;
+}
+
+.work-order-drawer-backdrop.is-open {
+  opacity: 1;
+}
+
+.work-order-drawer-panel.is-open {
+  transform: translateX(0);
+}
+
+.work-order-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.work-order-drawer-header h2 {
+  margin: 0;
+  font-size: 18px;
+  color: #243247;
+}
+
+.work-order-drawer-close {
+  border: 0;
+  background: transparent;
+  font-size: 34px;
+  line-height: 1;
+  cursor: pointer;
+  color: #64748b;
+}
+
+.work-order-drawer-body {
+  overflow: auto;
+  padding: 0;
+}
+
+@media (max-width: 980px) {
+  .work-order-drawer-panel {
+    width: 100vw;
+  }
+}

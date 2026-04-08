@@ -1,0 +1,164 @@
+.page {
+  padding: 12px;
+}
+
+.card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.header {
+  margin-bottom: 12px;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.form {
+  display: grid;
+  gap: 14px;
+}
+
+.grid2,
+.grid3 {
+  display: grid;
+  gap: 12px;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+}
+
+.field span {
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+input,
+select,
+textarea,
+button {
+  width: 100%;
+  min-height: 42px;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  padding: 10px 12px;
+  font-size: 1rem;
+  background: #fff;
+}
+
+textarea {
+  min-height: 96px;
+  resize: vertical;
+}
+
+.box {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px;
+  background: #f8fafc;
+}
+
+.boxHeader,
+.sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.subtitle {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.checkRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.checkRow input {
+  width: auto;
+  min-height: auto;
+}
+
+.inputsSection {
+  display: grid;
+  gap: 10px;
+}
+
+.insumoGridHead {
+  display: none;
+}
+
+.insumoRow {
+  display: grid;
+  gap: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px;
+  background: #fff;
+}
+
+.primaryBtn,
+.secondaryBtn,
+.dangerBtn {
+  border: none;
+  color: #fff;
+  background: #1e3a56;
+  cursor: pointer;
+}
+
+.dangerBtn {
+  background: #334155;
+}
+
+.footerActions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (min-width: 640px) {
+  .page {
+    padding: 18px;
+  }
+
+  .grid2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .grid3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 900px) {
+  .grid3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .insumoGridHead {
+    display: grid;
+    grid-template-columns: 2fr 1.2fr 1.2fr 0.8fr;
+    gap: 8px;
+    font-weight: 600;
+    font-size: 0.92rem;
+    color: #334155;
+  }
+
+  .insumoRow {
+    grid-template-columns: 2fr 1.2fr 1.2fr 0.8fr;
+    align-items: center;
+  }
+
+  .actionsCol {
+    text-align: center;
+  }
+}

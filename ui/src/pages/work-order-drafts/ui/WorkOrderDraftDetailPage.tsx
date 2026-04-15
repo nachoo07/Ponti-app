@@ -107,7 +107,11 @@ export function WorkOrderDraftDetailPage() {
     setPdfError(null)
 
     try {
-      const { blob, fileName } = await downloadWorkOrderDraftPdf(draft.id)
+      const downloadResult = isGroupedDraft
+        ? await downloadWorkOrderDraftGroupPdf(draft.id)
+        : await downloadWorkOrderDraftPdf(draft.id)
+
+      const { blob, fileName } = downloadResult
       const file = new File([blob], fileName, { type: 'application/pdf' })
 
       if (navigator.share && navigator.canShare?.({ files: [file] })) {
@@ -183,14 +187,6 @@ export function WorkOrderDraftDetailPage() {
             <span className={`work-order-draft-detail-status is-${draft.status}`}>
               {formatWorkOrderDraftStatus(draft.status)}
             </span>
-            <button
-              type="button"
-              className="work-order-draft-detail-editBtn"
-              onClick={handleShareDraftPdf}
-              disabled={isDownloadingPdf}
-            >
-              {isDownloadingPdf ? 'Preparando PDF...' : 'Compartir PDF'}
-            </button>
             <button
               type="button"
               className="work-order-draft-detail-editBtn"

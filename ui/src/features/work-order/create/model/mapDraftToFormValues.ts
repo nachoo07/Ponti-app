@@ -8,6 +8,7 @@ export type WorkOrderDraftFormValues = {
   observations: string
   selectedCustomerId: number
   selectedProjectId: number
+  selectedCampaignId: number | ''
   selectedFieldId: number
   selectedLotId: number
   selectedLaborId: number
@@ -31,6 +32,7 @@ export function mapDraftToFormValues(
     observations: draft.observations,
     selectedCustomerId: draft.customer_id,
     selectedProjectId: draft.project_id,
+    selectedCampaignId: draft.campaign_id ?? '',
     selectedFieldId: draft.field_id,
     selectedLotId: draft.lot_id,
     selectedLaborId: draft.labor_id,

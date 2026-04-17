@@ -105,6 +105,9 @@ export function WorkOrderForm({
   const [workOrderNumber, setWorkOrderNumber] = useState(initialValues?.workOrderNumber ?? '')
   const [workOrderDate, setWorkOrderDate] = useState(
     initialValues?.workOrderDate ?? getTodayDateInputValue(),)
+  const [selectedCampaignId, setSelectedCampaignId] = useState<number | ''>(
+    initialValues?.selectedCampaignId ?? '',
+  )
   const [isLoadingNumberPreview, setIsLoadingNumberPreview] = useState(false)
   const [numberPreviewError, setNumberPreviewError] = useState<string | null>(null)
 
@@ -123,6 +126,7 @@ export function WorkOrderForm({
     setLots([])
     setSelectedLotId('')
     setSelectedLot(null)
+    setSelectedCampaignId('')
     setSelectedLaborId('')
     setContractor('')
     setSelectedInvestorId('')
@@ -142,6 +146,7 @@ export function WorkOrderForm({
     setLots([])
     setSelectedLotId('')
     setSelectedLot(null)
+    setSelectedCampaignId('')
     setSelectedLaborId('')
     setContractor('')
     setSelectedInvestorId('')
@@ -235,7 +240,6 @@ export function WorkOrderForm({
       try {
         const response = await previewDigitalWorkOrderNumber({
           project_id: Number(selectedProjectId),
-          ...(workOrderNumber.trim() ? { number: workOrderNumber.trim() } : {}),
         })
 
         if (cancelled) return
@@ -323,13 +327,36 @@ export function WorkOrderForm({
     return `${integerPart}.${decimalParts.join('')}`
   }
 
-    function getSupplyLabel(row: SupplyRow): string {
+  function getSupplyLabel(row: SupplyRow): string {
     const matchedSupply =
       row.supply_id === ''
         ? null
         : supplies.find((supply) => supply.id === row.supply_id) ?? null
 
     return row.supply_name?.trim() || matchedSupply?.name || ''
+  }
+
+  function handleNumberBlur() {
+    if (selectedProjectId === '') return
+
+    void (async () => {
+      setIsLoadingNumberPreview(true)
+      setNumberPreviewError(null)
+
+      try {
+        const response = await previewDigitalWorkOrderNumber({
+          project_id: Number(selectedProjectId),
+          ...(workOrderNumber.trim() ? { number: workOrderNumber.trim() } : {}),
+        })
+        setWorkOrderNumber(response.number)
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'No se pudo validar el numero sugerido'
+        setNumberPreviewError(message)
+      } finally {
+        setIsLoadingNumberPreview(false)
+      }
+    })()
   }
 
   async function handleSaveDraft() {
@@ -361,7 +388,7 @@ export function WorkOrderForm({
       date: workOrderDate,
       customerId: selectedCustomerId,
       projectId: selectedProjectId,
-      campaignId: null,
+      campaignId: selectedCampaignId === '' ? null : selectedCampaignId,
       fieldId: selectedFieldId,
       lotId: selectedLotId,
       selectedLot,
@@ -385,6 +412,7 @@ export function WorkOrderForm({
     }
 
     setPdfActionError(null)
+    setIsSavingDraft(true)
     if (draftId) {
       setLastCreatedDraftId(null)
       setLastCreatedDraftNumber(null)
@@ -528,6 +556,7 @@ export function WorkOrderForm({
                     setWorkOrderNumber(event.target.value)
                     setNumberPreviewError(null)
                   }}
+                  onBlur={handleNumberBlur}
                   disabled={selectedProjectId === ''}
                 />
                 {numberPreviewError ? <small>{numberPreviewError}</small> : null}
@@ -593,10 +622,14 @@ export function WorkOrderForm({
                   <label className={styles.field}>
                     <span>Campaña</span>
                     <select
+                      value={selectedCampaignId}
+                      onChange={(event) => {
+                        const value = event.target.value
+                        setSelectedCampaignId(value ? Number(value) : '')
+                      }}
                       disabled={!selectedProject || isLoadingCampaigns || !!campaignsError}
-                      defaultValue=""
                     >
-                      <option value="" disabled>
+                      <option value="">
                         Seleccionar...
                       </option>
 

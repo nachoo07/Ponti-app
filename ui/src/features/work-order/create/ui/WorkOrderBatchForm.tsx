@@ -50,6 +50,26 @@ function getTodayDateInputValue(): string {
     return today.toISOString().slice(0, 10)
 }
 
+function roundTo(value: number, decimals: number): number {
+    const factor = 10 ** decimals
+    return Math.round(value * factor) / factor
+}
+
+function formatDose(value: number): string {
+    if (!Number.isFinite(value)) return ''
+    return roundTo(value, 3).toFixed(3).replace(/\.?0+$/, '')
+}
+
+function formatTotalUsedFromDose(value: number): string {
+    if (!Number.isFinite(value)) return ''
+    return roundTo(value, 0).toFixed(2)
+}
+
+function formatCalculatedDecimal(value: number, maxDecimals = 3): string {
+    if (!Number.isFinite(value)) return ''
+    return value.toFixed(maxDecimals).replace(/\.?0+$/, '')
+}
+
 function buildEmptySupplyRow(): BatchSharedSupplyFormRow {
     return {
         rowId: crypto.randomUUID(),
@@ -262,7 +282,6 @@ export function WorkOrderBatchForm() {
             try {
                 const response = await previewBatchDigitalWorkOrderNumber({
                     project_id: Number(selectedProjectId),
-                    ...(workOrderNumber.trim() ? { number: workOrderNumber.trim() } : {}),
                 })
 
                 if (cancelled) return
@@ -392,26 +411,6 @@ export function WorkOrderBatchForm() {
             }),
         )
     }, [totalEffectiveArea])
-
-    function roundTo(value: number, decimals: number): number {
-        const factor = 10 ** decimals
-        return Math.round(value * factor) / factor
-    }
-
-    function formatDose(value: number): string {
-        if (!Number.isFinite(value)) return ''
-        return roundTo(value, 3).toFixed(3).replace(/\.?0+$/, '')
-    }
-
-    function formatTotalUsedFromDose(value: number): string {
-        if (!Number.isFinite(value)) return ''
-        return roundTo(value, 0).toFixed(2)
-    }
-
-    function formatCalculatedDecimal(value: number, maxDecimals = 3): string {
-        if (!Number.isFinite(value)) return ''
-        return value.toFixed(maxDecimals).replace(/\.?0+$/, '')
-    }
 
     function getFilteredSupplies(rowId: string): Supply[] {
         const search = (supplySearchByRow[rowId] ?? '').trim().toLowerCase()
@@ -981,7 +980,7 @@ export function WorkOrderBatchForm() {
                                     }}
                                     disabled={!selectedProject || isLoadingCampaigns || !!campaignsError}
                                 >
-                                    <option value="" disabled>
+                                    <option value="">
                                         Seleccionar...
                                     </option>
 

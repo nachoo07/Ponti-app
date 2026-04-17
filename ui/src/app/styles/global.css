@@ -68,6 +68,8 @@ html {
 body {
   position: relative;
   font-family: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
   color: var(--color-text);
   background:
     radial-gradient(circle at top left, rgba(123, 163, 189, 0.16), transparent 32%),
@@ -86,7 +88,6 @@ body::before {
   z-index: -1;
 }
 
-body,
 button,
 input,
 select,

@@ -1,0 +1,8 @@
+.git
+.claude
+.codex
+api/node_modules
+api/dist
+ui/node_modules
+ui/dist
+npm-debug.log

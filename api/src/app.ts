@@ -1,19 +1,23 @@
 import cors from 'cors'
 import express from 'express'
-import authRoutes from './routes/auth'
-import campaignsRoutes from './routes/campaigns'
-import customersRoutes from './routes/customers'
-import laborsRoutes from './routes/labors'
-import projectsRoutes from './routes/projects'
-import suppliesRoutes from './routes/supplies'
-import stockRoutes from './routes/stock'
-import workOrderDraftRoutes from './routes/workOrderDrafts'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import authRoutes from './routes/auth.js'
+import campaignsRoutes from './routes/campaigns.js'
+import customersRoutes from './routes/customers.js'
+import laborsRoutes from './routes/labors.js'
+import projectsRoutes from './routes/projects.js'
+import suppliesRoutes from './routes/supplies.js'
+import stockRoutes from './routes/stock.js'
+import workOrderDraftRoutes from './routes/workOrderDrafts.js'
 
 export function createApp() {
   const app = express()
+  const frontendPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), 'public')
 
   app.use(cors())
   app.use(express.json())
+  app.use(express.static(frontendPath))
 
   app.get('/health', (_req, res) => {
     res.status(200).json({ ok: true })
@@ -27,8 +31,9 @@ export function createApp() {
   app.use('/api/v1/supplies', suppliesRoutes)
   app.use('/api/v1/stock', stockRoutes)
   app.use('/api/v1/work-order-drafts', workOrderDraftRoutes)
+  app.get(/^(?!\/api\/v1|\/health).*/, (_req, res) => {
+    res.sendFile(path.join(frontendPath, 'index.html'))
+  })
 
   return app
 }
-
-

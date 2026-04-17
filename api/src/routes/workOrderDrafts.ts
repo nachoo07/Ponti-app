@@ -1,7 +1,7 @@
 import type { Request } from 'express'
 import { Router } from 'express'
-import { config } from '../config'
-import { managerApi } from '../services/http'
+import { config } from '../config.js'
+import { managerApi } from '../services/http.js'
 
 const router = Router()
 

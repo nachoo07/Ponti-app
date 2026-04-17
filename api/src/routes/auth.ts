@@ -1,6 +1,6 @@
 import { Router } from 'express'
-import { config } from '../config'
-import { identityApi, secureTokenApi } from '../services/http'
+import { config } from '../config.js'
+import { identityApi, secureTokenApi } from '../services/http.js'
 
 const router = Router()
 

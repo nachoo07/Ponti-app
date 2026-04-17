@@ -65,7 +65,7 @@ jobs:
 
       - name: Deploy a Cloud Run (DEV)
         run: |
-          ENV_VARS="NODE_ENV=production,PORT=8080,BASE_MANAGER_API=${BASE_MANAGER_API},IDENTITY_PLATFORM_PROJECT_ID=${IDENTITY_PLATFORM_PROJECT_ID}"
+          ENV_VARS="NODE_ENV=production,BASE_MANAGER_API=${BASE_MANAGER_API},IDENTITY_PLATFORM_PROJECT_ID=${IDENTITY_PLATFORM_PROJECT_ID}"
           gcloud run deploy "$SERVICE_NAME" \
             --project="$GCP_PROJECT_ID" \
             --region="$GCP_REGION" \

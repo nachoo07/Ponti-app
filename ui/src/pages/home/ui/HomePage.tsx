@@ -6,21 +6,32 @@ export function HomePage() {
     <main className="home-page">
       <section className="home-shell">
         <header className="home-header">
-          <p className="home-kicker">Inicio</p>
-          <h1 className="home-title">Ordenes de trabajo</h1>
-          <p className="home-description">Elegí una acción para continuar.</p>
+          <p className="home-kicker">Workspace</p>
+          <h1 className="home-title">Centro operativo</h1>
+          <p className="home-description">
+            Accede rapido a la carga de ordenes o al historial digital desde una interfaz pensada
+            para uso diario.
+          </p>
         </header>
 
         <section className="home-grid">
           <article className="home-card">
             <Link to="/work-orders" className="home-card-link">
-              Crear nueva OT
+              <span className="home-card-eyebrow">Carga</span>
+              <span className="home-card-title">Crear nueva OT</span>
+              <span className="home-card-copy">
+                Arma borradores por lote, calcula dosis y comparte PDF desde un solo flujo.
+              </span>
             </Link>
           </article>
 
           <article className="home-card">
             <Link to="/work-order-drafts" className="home-card-link">
-              Ver órdenes cargadas
+              <span className="home-card-eyebrow">Seguimiento</span>
+              <span className="home-card-title">Ver ordenes cargadas</span>
+              <span className="home-card-copy">
+                Revisa borradores, detalles y estado de publicacion con filtros rapidos.
+              </span>
             </Link>
           </article>
         </section>

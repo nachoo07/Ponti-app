@@ -1,12 +1,30 @@
 import { useState } from 'react'
-import { NavLink, useNavigate } from 'react-router-dom'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../app/providers/AuthContext'
 import styles from './Navbar.module.css'
 
+function getPageTitle(pathname: string) {
+  if (pathname.startsWith('/work-order-drafts/')) {
+    return 'Detalle de orden'
+  }
+
+  if (pathname.startsWith('/work-order-drafts')) {
+    return 'Ordenes digitales'
+  }
+
+  if (pathname.startsWith('/work-orders')) {
+    return 'Nueva OT'
+  }
+
+  return 'Inicio'
+}
+
 export function Navbar() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { isAuthenticated, session, logout } = useAuth()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const pageTitle = getPageTitle(location.pathname)
 
   function handleLogout() {
     logout()
@@ -22,6 +40,21 @@ export function Navbar() {
     <header className={styles.header}>
       <nav className={styles.nav}>
         <div className={styles.topRow}>
+          <div className={styles.brandGroup}>
+            <NavLink to="/home" className={styles.brand} onClick={handleNavigate}>
+              <span className={styles.brandMark}>
+                <img src="/ponti.svg" alt="" aria-hidden="true" />
+              </span>
+
+              <span className={styles.brandText}>
+                <strong>Ponti</strong>
+                <small>Operacion digital</small>
+              </span>
+            </NavLink>
+
+            <span className={styles.brandDivider} aria-hidden="true" />
+            <span className={styles.pageTitle}>{pageTitle}</span>
+          </div>
 
           <button
             type="button"

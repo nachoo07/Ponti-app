@@ -34,6 +34,10 @@ export function LoginPage() {
         <div className="login-hero-inner">
           <LoginLogo />
           <p className="login-tagline">Es gestion. Es trazabilidad. Es simple.</p>
+          <p className="login-hero-description">
+            Controla ordenes, lotes, insumos y seguimiento operativo desde una experiencia clara y
+            preparada para celular.
+          </p>
         </div>
 
         <p className="login-version">Ponti Software v1.0</p>
@@ -41,6 +45,7 @@ export function LoginPage() {
 
       <section className="login-panel">
         <div className="login-card">
+          <p className="login-kicker">Ponti Mobile</p>
           <h2 className="login-title">Bienvenido</h2>
           <p className="login-description">
             Ingresa con tu email o usuario y contrasena para acceder al sistema de gestion.

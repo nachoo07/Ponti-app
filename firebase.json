@@ -1,0 +1,24 @@
+{
+  "hosting": {
+    "site": "ponti-mobile-dev",
+    "public": "ui/dist",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "/api/v1/**",
+        "run": {
+          "serviceId": "ponti-mobile",
+          "region": "us-central1"
+        }
+      },
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  }
+}

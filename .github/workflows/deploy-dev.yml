@@ -1,4 +1,4 @@
-name: Deploy DEV (Cloud Run)
+name: Deploy DEV (Cloud Run + Hosting)
 
 on:
   push:
@@ -27,6 +27,7 @@ jobs:
       ARTIFACT_REGISTRY: ${{ vars.ARTIFACT_REGISTRY || 'cloud-run-source-deploy' }}
       IMAGE_NAME: ${{ vars.IMAGE_NAME || 'ponti-mobile' }}
       SERVICE_NAME: ${{ vars.SERVICE_NAME_DEV || 'ponti-mobile' }}
+      HOSTING_SITE_ID: ${{ vars.FIREBASE_HOSTING_SITE_DEV || 'ponti-mobile-dev' }}
       CLOUD_RUN_SERVICE_ACCOUNT: ${{ vars.CLOUD_RUN_SERVICE_ACCOUNT_DEV || 'cloudrun-sa@new-ponti-dev.iam.gserviceaccount.com' }}
       WIF_PROVIDER: ${{ vars.WIF_PROVIDER_DEV }}
       WIF_SERVICE_ACCOUNT: ${{ vars.WIF_SERVICE_ACCOUNT_DEV }}
@@ -51,15 +52,27 @@ jobs:
         with:
           project_id: ${{ env.GCP_PROJECT_ID }}
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.19.0'
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      - name: Build UI
+        run: |
+          npm --prefix ui ci
+          npm --prefix ui run build
+
       - name: Configure Docker auth
         run: gcloud auth configure-docker "${{ env.GCP_REGION }}-docker.pkg.dev" --quiet
 
-      - name: Build y push imagen
+      - name: Build y push imagen API
         env:
           IMAGE_TAG: ${{ github.sha }}
         run: |
           image_uri="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${ARTIFACT_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
-          docker build -t "$image_uri" .
+          docker build -f Dockerfile.api -t "$image_uri" .
           docker push "$image_uri"
           echo "IMAGE_URI=$image_uri" >> "$GITHUB_ENV"
 
@@ -86,6 +99,17 @@ jobs:
             exit 1
           fi
           echo "SERVICE_URL=$service_url" >> "$GITHUB_ENV"
+
+      - name: Deploy UI a Firebase Hosting (DEV)
+        run: |
+          npx -y firebase-tools deploy \
+            --only hosting \
+            --project "$GCP_PROJECT_ID" \
+            --non-interactive
+
+      - name: Resolve Hosting URL (DEV)
+        run: |
+          echo "HOSTING_URL=https://${HOSTING_SITE_ID}.web.app" >> "$GITHUB_ENV"
 
       - name: Guardrail traffic/latest + URLs estables (DEV)
         run: |
@@ -122,10 +146,10 @@ jobs:
       - name: Smoke release checks (DEV)
         run: |
           curl -fsS "$SERVICE_URL/health" >/dev/null
-          curl -fsSI "$SERVICE_URL/" >/dev/null
-          curl -fsSI "$SERVICE_URL/home" >/dev/null
+          curl -fsSI "$HOSTING_URL/" >/dev/null
+          curl -fsSI "$HOSTING_URL/home" >/dev/null
           status="$(curl -sS -o /tmp/login-response.json -w '%{http_code}' \
-            -X POST "$SERVICE_URL/api/v1/auth/login" \
+            -X POST "$HOSTING_URL/api/v1/auth/login" \
             -H 'Content-Type: application/json' \
             --data '{"email":"invalid","password":"invalid"}')"
           if [[ "$status" != "401" ]]; then
@@ -133,3 +157,8 @@ jobs:
             cat /tmp/login-response.json || true
             exit 1
           fi
+
+      - name: Show deployment URLs (DEV)
+        run: |
+          echo "✅ Cloud Run DEV API: $SERVICE_URL"
+          echo "✅ Firebase Hosting DEV: $HOSTING_URL"

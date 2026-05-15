@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import type { InvestorSplit, Lot } from '../../../../entities/project/model/project.types'
 import { useWorkOrderWorkspace } from '../model/useWorkOrderWorkspace'
@@ -11,7 +11,11 @@ import { previewDigitalWorkOrderNumber } from '../../../../entities/workOrderDra
 import type { Supply, SupplyRow } from '../../../../entities/supply/model/supply.types'
 import type { WorkOrderDraftFormValues } from '../model/mapDraftToFormValues'
 import { updateWorkOrderDraft } from '../../../../entities/workOrderDraft/api/updateWorkOrderDraft'
-
+import type {
+  CreateWorkOrderDraftPayload,
+  UpdateWorkOrderDraftGroupPayload,
+} from '../../../../entities/workOrderDraft/model/workOrderDraft.types'
+import { buildUpdateWorkOrderDraftGroupPayload } from '../model/buildUpdateWorkOrderDraftGroupPayload'
 import './WorkOrderForm.css'
 
 const styles = {
@@ -50,6 +54,11 @@ type WorkOrderFormProps = {
   initialDraftId?: number | null
   isReadOnly?: boolean
   hideContextFields?: boolean
+  isGroupedDraft?: boolean
+  onUpdateDraft?: (
+    draftId: number,
+    payload: CreateWorkOrderDraftPayload | UpdateWorkOrderDraftGroupPayload,
+  ) => Promise<void>
   onDraftSaved?: (draftId: number) => void | Promise<void>
   onDraftSaveError?: (message: string | null) => void
 }
@@ -59,6 +68,8 @@ export function WorkOrderForm({
   initialDraftId,
   isReadOnly = false,
   hideContextFields = false,
+  isGroupedDraft = false,
+  onUpdateDraft,
   onDraftSaved,
   onDraftSaveError,
 }: WorkOrderFormProps) {
@@ -99,6 +110,7 @@ export function WorkOrderForm({
   const [supplyRows, setSupplyRows] = useState<SupplyRow[]>(
     initialValues?.supplyRows ?? [buildEmptySupplyRow()],
   )
+  const shouldRecalculateDoseOnAreaChange = useRef(!initialValues)
 
   const [effectiveArea, setEffectiveArea] = useState(initialValues?.effectiveArea ?? '')
   const [observations, setObservations] = useState(initialValues?.observations ?? '')
@@ -265,6 +277,10 @@ export function WorkOrderForm({
 
 
   useEffect(() => {
+    if (!shouldRecalculateDoseOnAreaChange.current) {
+      return
+    }
+
     const surface = parseDecimal(effectiveArea)
 
     setSupplyRows((current) =>
@@ -275,7 +291,7 @@ export function WorkOrderForm({
 
         const totalUsed = parseDecimal(row.total_used)
         const finalDose =
-          surface > 0 ? formatCalculatedDecimal(totalUsed / surface) : ''
+          surface > 0 ? formatDoseDecimal(totalUsed / surface) : ''
 
         return {
           ...row,
@@ -307,13 +323,17 @@ export function WorkOrderForm({
   const projectInvestors = selectedProjectDetail?.investors ?? []
 
   function parseDecimal(value: string): number {
-    const normalized = Number(value)
+    const normalized = Number(value.replace(',', '.'))
     return Number.isFinite(normalized) ? normalized : 0
   }
 
   function formatCalculatedDecimal(value: number): string {
     if (!Number.isFinite(value)) return ''
-    return value.toFixed(3).replace(/\.?0+$/, '')
+    return value.toFixed(4).replace(/\.?0+$/, '')
+  }
+
+  function formatDoseDecimal(value: number): string {
+    return formatCalculatedDecimal(value).replace('.', ',')
   }
 
   function normalizeDecimalInput(value: string): string {
@@ -325,6 +345,17 @@ export function WorkOrderForm({
     }
 
     return `${integerPart}.${decimalParts.join('')}`
+  }
+
+  function normalizeDoseInput(value: string): string {
+    const normalized = value.replace(/[^0-9,.]/g, '').replace(/[,.]/g, ',')
+    const [integerPart = '', ...decimalParts] = normalized.split(',')
+
+    if (decimalParts.length === 0) {
+      return integerPart
+    }
+
+    return `${integerPart},${decimalParts.join('')}`
   }
 
   function getSupplyLabel(row: SupplyRow): string {
@@ -360,20 +391,25 @@ export function WorkOrderForm({
   }
 
   async function handleSaveDraft() {
-    if (
+    const missingBaseFields =
       selectedCustomerId === '' ||
       selectedProjectId === '' ||
       selectedFieldId === '' ||
-      selectedLotId === '' ||
-      selectedLot === null ||
       selectedLaborId === ''
-    ) {
+
+    const missingSingleLotFields = !isGroupedDraft && (selectedLotId === '' || selectedLot === null)
+
+    if (missingBaseFields || missingSingleLotFields) {
       setValidationErrors(['Completá los datos obligatorios antes de guardar la orden.'])
       setSaveDraftError(null)
       setSaveDraftSuccessMessage(null)
       return
     }
 
+    const customerId = selectedCustomerId as number
+    const projectId = selectedProjectId as number
+    const fieldId = selectedFieldId as number
+    const lotId = selectedLotId as number
     const selectedLabor = labors.find((labor) => labor.id === selectedLaborId)
 
     if (!selectedLabor) {
@@ -383,32 +419,51 @@ export function WorkOrderForm({
       return
     }
 
-    const payload = buildCreateWorkOrderDraftPayload({
-      number: workOrderNumber,
-      date: workOrderDate,
-      customerId: selectedCustomerId,
-      projectId: selectedProjectId,
-      campaignId: selectedCampaignId === '' ? null : selectedCampaignId,
-      fieldId: selectedFieldId,
-      lotId: selectedLotId,
-      selectedLot,
-      selectedLabor,
-      contractor,
-      effectiveArea,
-      observations,
-      selectedInvestorId: selectedInvestorId === '' ? 0 : selectedInvestorId,
-      splitContribution,
-      investorSplits,
-      supplyRows,
-    })
+    const payload: CreateWorkOrderDraftPayload | UpdateWorkOrderDraftGroupPayload = isGroupedDraft
+      ? buildUpdateWorkOrderDraftGroupPayload({
+          number: workOrderNumber,
+          date: workOrderDate,
+          customerId,
+          projectId,
+          campaignId: selectedCampaignId === '' ? null : selectedCampaignId,
+          fieldId,
+          cropId: initialValues?.selectedCropId || selectedLot?.current_crop_id || 0,
+          selectedLabor,
+          contractor,
+          observations,
+          selectedInvestorId: selectedInvestorId === '' ? 0 : selectedInvestorId,
+          splitContribution,
+          investorSplits,
+          supplyRows,
+        })
+      : buildCreateWorkOrderDraftPayload({
+          number: workOrderNumber,
+          date: workOrderDate,
+          customerId,
+          projectId,
+          campaignId: selectedCampaignId === '' ? null : selectedCampaignId,
+          fieldId,
+          lotId,
+          selectedLot: selectedLot!,
+          selectedLabor,
+          contractor,
+          effectiveArea,
+          observations,
+          selectedInvestorId: selectedInvestorId === '' ? 0 : selectedInvestorId,
+          splitContribution,
+          investorSplits,
+          supplyRows,
+        })
 
-    const errors = validateCreateWorkOrderDraft(payload)
+    if (!isGroupedDraft) {
+      const errors = validateCreateWorkOrderDraft(payload as CreateWorkOrderDraftPayload)
 
-    if (errors.length > 0) {
-      setValidationErrors(errors)
-      setSaveDraftError(null)
-      setSaveDraftSuccessMessage(null)
-      return
+      if (errors.length > 0) {
+        setValidationErrors(errors)
+        setSaveDraftError(null)
+        setSaveDraftSuccessMessage(null)
+        return
+      }
     }
 
     setPdfActionError(null)
@@ -423,7 +478,12 @@ export function WorkOrderForm({
 
     try {
       if (draftId) {
-        await updateWorkOrderDraft(draftId, payload)
+        if (onUpdateDraft) {
+          await onUpdateDraft(draftId, payload)
+        } else {
+          await updateWorkOrderDraft(draftId, payload as CreateWorkOrderDraftPayload)
+        }
+
         setDraftId(draftId)
         setSaveDraftSuccessMessage(
           payload.number
@@ -433,7 +493,7 @@ export function WorkOrderForm({
         onDraftSaveError?.(null)
         await onDraftSaved?.(draftId)
       } else {
-        const response = await createWorkOrderDraft(payload)
+        const response = await createWorkOrderDraft(payload as CreateWorkOrderDraftPayload)
         setLastCreatedDraftId(response.id)
         setLastCreatedDraftNumber(payload.number ?? null)
         setPdfActionError(null)
@@ -680,28 +740,37 @@ export function WorkOrderForm({
             <div className={styles.grid3}>
               <label className={styles.field}>
                 <span>Lote</span>
-                <select
-                  value={selectedLotId}
-                  onChange={(event) => {
-                    const value = event.target.value
-                    const lotId = value ? Number(value) : ''
-                    const lot = lots.find((item) => item.id === Number(value)) ?? null
+                {(isGroupedDraft || isReadOnly) && initialValues?.lotDisplayName ? (
+  <input
+    type="text"
+    value={initialValues.lotDisplayName}
+    placeholder="Se completa automaticamente"
+    readOnly
+  />
+                ) : (
+                  <select
+                    value={selectedLotId}
+                    onChange={(event) => {
+                      const value = event.target.value
+                      const lotId = value ? Number(value) : ''
+                      const lot = lots.find((item) => item.id === Number(value)) ?? null
 
-                    setSelectedLotId(lotId)
-                    setSelectedLot(lot)
-                  }}
-                  disabled={!selectedFieldId}
-                >
-                  <option value="" disabled>
-                    Seleccionar...
-                  </option>
-
-                  {lots.map((lot) => (
-                    <option key={lot.id} value={lot.id}>
-                      {lot.name}
+                      setSelectedLotId(lotId)
+                      setSelectedLot(lot)
+                    }}
+                    disabled={!selectedFieldId}
+                  >
+                    <option value="" disabled>
+                      Seleccionar...
                     </option>
-                  ))}
-                </select>
+
+                    {lots.map((lot) => (
+                      <option key={lot.id} value={lot.id}>
+                        {lot.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </label>
               <label className={styles.field}>
                 <span>Cultivo actual</span>
@@ -749,6 +818,7 @@ export function WorkOrderForm({
                   inputMode="decimal"
                   value={effectiveArea}
                   onChange={(event) => {
+                    shouldRecalculateDoseOnAreaChange.current = true
                     setEffectiveArea(normalizeDecimalInput(event.target.value))
                   }}
                 />
@@ -943,9 +1013,16 @@ export function WorkOrderForm({
                         Seleccionar...
                       </option>
 
+                      {row.supply_id !== '' &&
+                      !supplies.some((supply) => supply.id === row.supply_id) ? (
+                        <option value={row.supply_id}>
+                          {getSupplyLabel(row) || `Insumo #${row.supply_id}`}
+                        </option>
+                      ) : null}
+
                       {supplies.map((supply) => {
-                        const isUsedInAnotherRow = supplyRows.some(
-                          (item) => item.rowId !== row.rowId && item.supply_id === supply.id,
+	                        const isUsedInAnotherRow = supplyRows.some(
+	                          (item) => item.rowId !== row.rowId && item.supply_id === supply.id,
                         )
 
                         return (
@@ -969,7 +1046,7 @@ export function WorkOrderForm({
                       const totalUsed = parseDecimal(value)
                       const nextDose =
                         surface > 0 && value !== ''
-                          ? formatCalculatedDecimal(totalUsed / surface)
+                          ? formatDoseDecimal(totalUsed / surface)
                           : ''
 
                       setSupplyRows((current) =>
@@ -987,14 +1064,12 @@ export function WorkOrderForm({
                   />
 
                   <input
-                    type="number"
+                    type="text"
                     placeholder="Total/superficie"
-                    min="0"
-                    step="0.01"
                     inputMode="decimal"
                     value={row.final_dose}
                     onChange={(event) => {
-                      const value = event.target.value
+                      const value = normalizeDoseInput(event.target.value)
                       const surface = parseDecimal(effectiveArea)
                       const dose = parseDecimal(value)
                       const nextTotalUsed =

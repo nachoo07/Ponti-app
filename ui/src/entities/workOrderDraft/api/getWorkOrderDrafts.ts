@@ -37,7 +37,7 @@ export async function getWorkOrderDrafts({
   })
 
   const json = await apiJson<WorkOrderDraftListResponse>(
-    `/work-order-drafts/digital?${query.toString()}`,
+    `/work-order-drafts/digital/groups?${query.toString()}`,
   )
 
   const data = Array.isArray(json.data) ? json.data : []

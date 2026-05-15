@@ -18,6 +18,43 @@ function getManagerHeaders(req: Request) {
   }
 }
 
+router.get('/digital/groups', async (req, res) => {
+  const headers = getManagerHeaders(req)
+
+  if (!headers) {
+    res.status(401).json({ message: 'Usuario no autenticado' })
+    return
+  }
+
+  const number = typeof req.query.number === 'string' ? req.query.number : ''
+  const page = typeof req.query.page === 'string' ? req.query.page : ''
+  const perPage =
+    typeof req.query.per_page === 'string'
+      ? req.query.per_page
+      : typeof req.query.page_size === 'string'
+        ? req.query.page_size
+        : ''
+
+  try {
+    const response = await managerApi.get('/work-order-drafts/digital/groups', {
+      params: {
+        ...(number ? { number } : {}),
+        ...(page ? { page } : {}),
+        ...(perPage ? { per_page: perPage } : {}),
+      },
+      headers,
+    })
+
+    res.status(200).json(response.data)
+  } catch (error: any) {
+    res.status(error?.response?.status ?? 500).json(
+      error?.response?.data ?? {
+        message: 'No se pudieron obtener las ordenes digitales agrupadas',
+      },
+    )
+  }
+})
+
 router.get('/digital', async (req, res) => {
   const headers = getManagerHeaders(req)
 
@@ -235,6 +272,52 @@ router.get('/:id', async (req, res) => {
     res.status(error?.response?.status ?? 500).json(
       error?.response?.data ?? {
         message: 'No se pudo obtener la orden',
+      },
+    )
+  }
+})
+
+router.get('/:id/group', async (req, res) => {
+  const headers = getManagerHeaders(req)
+
+  if (!headers) {
+    res.status(401).json({ message: 'Usuario no autenticado' })
+    return
+  }
+
+  try {
+    const response = await managerApi.get(`/work-order-drafts/${req.params.id}/group`, {
+      headers,
+    })
+
+    res.status(200).json(response.data)
+  } catch (error: any) {
+    res.status(error?.response?.status ?? 500).json(
+      error?.response?.data ?? {
+        message: 'No se pudo obtener la orden agrupada',
+      },
+    )
+  }
+})
+
+router.put('/:id/group', async (req, res) => {
+  const headers = getManagerHeaders(req)
+
+  if (!headers) {
+    res.status(401).json({ message: 'Usuario no autenticado' })
+    return
+  }
+
+  try {
+    const response = await managerApi.put(`/work-order-drafts/${req.params.id}/group`, req.body, {
+      headers,
+    })
+
+    res.status(200).json(response.data)
+  } catch (error: any) {
+    res.status(error?.response?.status ?? 500).json(
+      error?.response?.data ?? {
+        message: 'No se pudo actualizar la orden agrupada',
       },
     )
   }

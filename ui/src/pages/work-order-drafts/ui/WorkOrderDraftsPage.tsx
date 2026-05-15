@@ -18,7 +18,14 @@ const defaultPageInfo: WorkOrderDraftListPageInfo = {
   total: 0,
 }
 
-type ColumnKey = 'number' | 'date' | 'project_name' | 'field_name' | 'status'
+type ColumnKey =
+  | 'number'
+  | 'date'
+  | 'project_name'
+  | 'field_name'
+  | 'effective_area'
+  | 'lots_count'
+  | 'status'
 
 type ColumnFilters = Record<ColumnKey, string[]>
 
@@ -27,6 +34,8 @@ const defaultColumnFilters: ColumnFilters = {
   date: [],
   project_name: [],
   field_name: [],
+  effective_area: [],
+  lots_count: [],
   status: [],
 }
 
@@ -131,6 +140,8 @@ export function WorkOrderDraftsPage() {
     date: '',
     project_name: '',
     field_name: '',
+    effective_area: '',
+    lots_count: '',
     status: '',
   })
   const [sortKey, setSortKey] = useState<ColumnKey | null>(null)
@@ -298,7 +309,7 @@ export function WorkOrderDraftsPage() {
 
 
   function renderColumnHeader(label: string, key: ColumnKey) {
-       const isFilterOpen = openColumnFilter === key
+    const isFilterOpen = openColumnFilter === key
     const isFilterActive = columnFilters[key].length > 0
 
     const options = getFilterOptions(key)
@@ -354,7 +365,7 @@ export function WorkOrderDraftsPage() {
               }}
             />
 
-                        <div className="work-order-drafts-filterOptions">
+            <div className="work-order-drafts-filterOptions">
               {visibleOptions.length === 0 ? (
                 <p className="work-order-drafts-filterEmpty">No hay opciones</p>
               ) : (
@@ -475,6 +486,8 @@ export function WorkOrderDraftsPage() {
                   <th>{renderColumnHeader('Fecha', 'date')}</th>
                   <th>{renderColumnHeader('Proyecto', 'project_name')}</th>
                   <th>{renderColumnHeader('Campo', 'field_name')}</th>
+                  <th>{renderColumnHeader('Sup. total', 'effective_area')}</th>
+                  <th>{renderColumnHeader('Lotes', 'lots_count')}</th>
                   <th>{renderColumnHeader('Estado', 'status')}</th>
                   <th className="work-order-drafts-actionsCol">Acción</th>
                 </tr>
@@ -483,7 +496,7 @@ export function WorkOrderDraftsPage() {
               <tbody>
                 {!isLoading && sortedDrafts.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="work-order-drafts-empty">
+                    <td colSpan={8} className="work-order-drafts-empty">
                       No hay ordenes digitales para mostrar.
                     </td>
                   </tr>
@@ -502,6 +515,8 @@ export function WorkOrderDraftsPage() {
                     <td>{normalizeDate(draft.date)}</td>
                     <td>{draft.project_name}</td>
                     <td>{draft.field_name}</td>
+                    <td>{draft.effective_area ?? '-'}</td>
+                    <td>{draft.lots_count ?? '-'}</td>
                     <td>
                       <span className={`work-order-drafts-status is-${draft.status}`}>
                         {formatWorkOrderDraftStatus(draft.status)}

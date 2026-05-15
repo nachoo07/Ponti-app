@@ -2,17 +2,19 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { downloadWorkOrderDraftGroupPdf } from '../../../entities/workOrderDraft/api/downloadWorkOrderDraftGroupPdf'
 import { downloadWorkOrderDraftPdf } from '../../../entities/workOrderDraft/api/downloadWorkOrderDraftPdf'
-import { getWorkOrderDraftById } from '../../../entities/workOrderDraft/api/getWorkOrderDraftById'
+import { getWorkOrderDraftGroupById } from '../../../entities/workOrderDraft/api/getWorkOrderDraftGroupById'
 import { formatWorkOrderDraftStatus } from '../../../entities/workOrderDraft/model/formatWorkOrderDraftStatus'
-import type { WorkOrderDraftDetail } from '../../../entities/workOrderDraft/model/workOrderDraftDetail.types'
+import type { WorkOrderDraftGroupDetail } from '../../../entities/workOrderDraft/model/workOrderDraftDetail.types'
 import { WorkOrderForm } from '../../../features/work-order/create/ui/WorkOrderForm'
 import { mapDraftToFormValues } from '../../../features/work-order/create/model/mapDraftToFormValues'
 import { ApiError } from '../../../shared/api/http'
+import { updateWorkOrderDraftGroup } from '../../../entities/workOrderDraft/api/updateWorkOrderDraftGroup'
+import type { UpdateWorkOrderDraftGroupPayload } from '../../../entities/workOrderDraft/model/workOrderDraft.types'
 import './WorkOrderDraftDetailPage.css'
 
 export function WorkOrderDraftDetailPage() {
   const { id } = useParams()
-  const [draft, setDraft] = useState<WorkOrderDraftDetail | null>(null)
+  const [draft, setDraft] = useState<WorkOrderDraftGroupDetail | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isEditing, setIsEditing] = useState(false)
@@ -26,7 +28,7 @@ export function WorkOrderDraftDetailPage() {
     setError(null)
 
     try {
-      const data = await getWorkOrderDraftById(draftId)
+      const data = await getWorkOrderDraftGroupById(draftId)
       setDraft(data)
       setIsEditing(false)
     } catch (loadError) {
@@ -63,7 +65,7 @@ export function WorkOrderDraftDetailPage() {
     setIsEditing(false)
   }
 
-    async function handleDownloadDraftPdf() {
+  async function handleDownloadDraftPdf() {
     if (!draft) return
 
     setIsDownloadingPdf(true)
@@ -165,9 +167,10 @@ export function WorkOrderDraftDetailPage() {
     )
   }
 
-    const initialValues = mapDraftToFormValues(draft)
+  const initialValues = mapDraftToFormValues(draft)
   const isPublished = draft.status === 'published'
-  const isGroupedDraft = /^D-\d+\.\d+$/.test(draft.number)
+  const isGroupedDraft = Boolean(draft.lots && draft.lots.length > 1)
+  const canEditGroupedDraft = !isPublished
 
   return (
     <main className="work-order-draft-detail-page">
@@ -211,7 +214,7 @@ export function WorkOrderDraftDetailPage() {
                   ? 'Descargar PDF completo'
                   : 'Descargar PDF'}
             </button>
-            {!isPublished ? (
+            {canEditGroupedDraft && !isPublished ? (
               <button
                 type="button"
                 className="work-order-draft-detail-editBtn"
@@ -291,16 +294,36 @@ export function WorkOrderDraftDetailPage() {
           </div>
         </section>
 
+        {draft.lots?.length ? (
+          <section className="work-order-draft-detail-metaCard">
+            <div className="work-order-draft-detail-metaGrid">
+              {draft.lots.map((lot) => (
+                <article key={lot.draft_id} className="work-order-draft-detail-metaItem">
+                  <span>{lot.number}</span>
+                  <strong>{lot.lot_name}</strong>
+                  <small>
+                    {lot.effective_area} ha · {formatWorkOrderDraftStatus(lot.status)}
+                  </small>
+                </article>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
         <section className="work-order-draft-detail-formCard">
           <WorkOrderForm
-            key={`${draft.id}-${draft.updated_at}-${isEditing ? 'editing' : 'readonly'}`}
-            initialValues={initialValues}
-            initialDraftId={draft.id}
-            isReadOnly={isPublished || !isEditing}
-            hideContextFields
-            onDraftSaved={handleDraftSaved}
-            onDraftSaveError={setSaveError}
-          />
+  key={`${draft.id}-${isEditing ? 'editing' : 'readonly'}`}
+  initialValues={initialValues}
+  initialDraftId={draft.id}
+  isReadOnly={isPublished || !isEditing}
+  hideContextFields
+  isGroupedDraft={isGroupedDraft}
+  onUpdateDraft={async (draftId, payload) => {
+    await updateWorkOrderDraftGroup(draftId, payload as UpdateWorkOrderDraftGroupPayload)
+  }}
+  onDraftSaved={handleDraftSaved}
+  onDraftSaveError={setSaveError}
+/>
         </section>
       </section>
     </main>

@@ -1,21 +1,18 @@
-import type { CreateWorkOrderDraftPayload } from '../../../../entities/workOrderDraft/model/workOrderDraft.types'
-import type { SupplyRow } from '../../../../entities/supply/model/supply.types'
 import type { InvestorSplit } from '../../../../entities/project/model/project.types'
-import type { Lot } from '../../../../entities/project/model/project.types'
 import type { Labor } from '../../../../entities/labor/model/labor.types'
+import type { SupplyRow } from '../../../../entities/supply/model/supply.types'
+import type { UpdateWorkOrderDraftGroupPayload } from '../../../../entities/workOrderDraft/model/workOrderDraft.types'
 
-type BuildCreateWorkOrderDraftPayloadParams = {
+type BuildUpdateWorkOrderDraftGroupPayloadParams = {
   number: string
   date: string
   customerId: number
   projectId: number
   campaignId?: number | null
   fieldId: number
-  lotId: number
-  selectedLot: Lot
+  cropId: number
   selectedLabor: Labor
   contractor: string
-  effectiveArea: string
   observations: string
   selectedInvestorId: number
   splitContribution: boolean
@@ -23,24 +20,22 @@ type BuildCreateWorkOrderDraftPayloadParams = {
   supplyRows: SupplyRow[]
 }
 
-export function buildCreateWorkOrderDraftPayload({
+export function buildUpdateWorkOrderDraftGroupPayload({
   number,
   date,
   customerId,
   projectId,
   campaignId = null,
   fieldId,
-  lotId,
-  selectedLot,
+  cropId,
   selectedLabor,
   contractor,
-  effectiveArea,
   observations,
   selectedInvestorId,
   splitContribution,
   investorSplits,
   supplyRows,
-}: BuildCreateWorkOrderDraftPayloadParams): CreateWorkOrderDraftPayload {
+}: BuildUpdateWorkOrderDraftGroupPayloadParams): UpdateWorkOrderDraftGroupPayload {
   const validItems = supplyRows
     .filter((row) => row.supply_id !== '')
     .map((row) => ({
@@ -67,11 +62,9 @@ export function buildCreateWorkOrderDraftPayload({
     project_id: projectId,
     campaign_id: campaignId,
     field_id: fieldId,
-    lot_id: lotId,
-    crop_id: selectedLot.current_crop_id ?? 0,
+    crop_id: cropId,
     labor_id: selectedLabor.id,
     contractor,
-    effective_area: effectiveArea,
     observations,
     investor_id: splitContribution
       ? validInvestorSplits?.[0]?.investor_id ?? 0

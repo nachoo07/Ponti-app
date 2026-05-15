@@ -12,8 +12,8 @@ import type { Project, ProjectDetail } from '../../../../entities/project/model/
 type UseWorkOrderWorkspaceParams = {
   onCustomerChange?: () => void
   onProjectChange?: () => void
-  initialCustomerId?: number
-  initialProjectId?: number
+  initialCustomerId?: number | ''
+  initialProjectId?: number | ''
 }
 
 

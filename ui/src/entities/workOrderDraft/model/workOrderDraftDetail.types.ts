@@ -49,6 +49,8 @@ export type WorkOrderDraftListItem = {
   field_name: string
   status: string
   is_digital?: boolean
+  lots_count?: number
+  effective_area?: string
   created_at: string
 }
 
@@ -64,3 +66,20 @@ export type WorkOrderDraftListResponse = {
   data: WorkOrderDraftListItem[]
 }
 
+export type WorkOrderDraftGroupLot = {
+  draft_id: number
+  number: string
+  lot_id: number
+  lot_name: string
+  effective_area: string
+  status: string
+}
+
+export type WorkOrderDraftGroupDetail = Partial<WorkOrderDraftDetail> & {
+  id: number
+  number: string
+  effective_area: string
+  status: string
+  lots: WorkOrderDraftGroupLot[]
+  items: WorkOrderDraftItem[]
+}

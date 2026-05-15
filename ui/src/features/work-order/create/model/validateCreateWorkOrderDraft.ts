@@ -64,7 +64,7 @@ export function validateCreateWorkOrderDraft(
       errors.push('Todos los insumos deben tener un total utilizado mayor a 0.')
     }
 
-    const finalDose = Number(item.final_dose)
+    const finalDose = Number(item.final_dose?.replace(',', '.'))
     if (!Number.isFinite(finalDose) || finalDose <= 0) {
       errors.push('Todos los insumos deben tener una dosis final mayor a 0.')
     }
@@ -104,4 +104,3 @@ export function validateCreateWorkOrderDraft(
 
   return [...new Set(errors)]
 }
-

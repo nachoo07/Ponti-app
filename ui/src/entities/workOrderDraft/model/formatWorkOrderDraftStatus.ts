@@ -4,8 +4,9 @@ export function formatWorkOrderDraftStatus(status: string): string {
       return 'Abierta'
     case 'published':
       return 'Cerrada'
+    case 'pending_review':
+      return 'Revisión pendiente'
     default:
       return status
   }
 }
-

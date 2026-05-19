@@ -254,6 +254,52 @@ router.get('/:id/group-pdf', async (req, res) => {
   }
 })
 
+router.get('/:id/pdf-data', async (req, res) => {
+  const headers = getManagerHeaders(req)
+
+  if (!headers) {
+    res.status(401).json({ message: 'Usuario no autenticado' })
+    return
+  }
+
+  try {
+    const response = await managerApi.get(`/work-order-drafts/${req.params.id}/pdf-data`, {
+      headers,
+    })
+
+    res.status(200).json(response.data)
+  } catch (error: any) {
+    res.status(error?.response?.status ?? 500).json(
+      error?.response?.data ?? {
+        message: 'No se pudieron obtener los datos del PDF',
+      },
+    )
+  }
+})
+
+router.get('/:id/group-pdf-data', async (req, res) => {
+  const headers = getManagerHeaders(req)
+
+  if (!headers) {
+    res.status(401).json({ message: 'Usuario no autenticado' })
+    return
+  }
+
+  try {
+    const response = await managerApi.get(`/work-order-drafts/${req.params.id}/group-pdf-data`, {
+      headers,
+    })
+
+    res.status(200).json(response.data)
+  } catch (error: any) {
+    res.status(error?.response?.status ?? 500).json(
+      error?.response?.data ?? {
+        message: 'No se pudieron obtener los datos del PDF grupal',
+      },
+    )
+  }
+})
+
 router.get('/:id', async (req, res) => {
   const headers = getManagerHeaders(req)
 

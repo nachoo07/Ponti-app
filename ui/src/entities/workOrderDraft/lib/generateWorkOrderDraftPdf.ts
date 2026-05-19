@@ -302,7 +302,7 @@ function orderSummaryFields(fields: DisplayField[]): DisplayField[] {
   return ordered.slice(0, 9)
 }
 
-function buildFileName(data: WorkOrderDraftPdfData, draftId: number, _isGrouped: boolean): string {
+function buildFileName(data: WorkOrderDraftPdfData, draftId: number): string {
   const number = displayValue(data.header?.number ?? data.number)
   const suffix = number === '-' ? String(draftId) : number
   const safeSuffix = suffix.replace(/[^\w.-]+/g, '-').replace(/^-+|-+$/g, '')
@@ -742,7 +742,7 @@ export async function generateWorkOrderDraftPdf(
   drawObservations(doc, displayValue(data.observations), y)
   drawFooter(doc, pageHeight)
 
-  const fileName = buildFileName(data, draftId, isGrouped)
+  const fileName = buildFileName(data, draftId)
   const blob = doc.output('blob')
 
   return { blob, fileName }

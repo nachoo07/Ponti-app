@@ -51,11 +51,11 @@ export function buildCreateBatchWorkOrderDraftPayload({
     : undefined
 
   const validItems = supplyRows
-    .filter((item) => item.supply_id !== '')
-    .map((item) => ({
-      supply_id: item.supply_id as number,
-      total_used: item.total_used,
-    }))
+  .filter((item) => item.supply_id !== '' || item.total_used || item.final_dose)
+  .map((item) => ({
+    supply_id: item.supply_id === '' ? 0 : item.supply_id,
+    total_used: item.total_used,
+  }))
 
   const normalizedNumber = number.trim()
 

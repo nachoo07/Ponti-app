@@ -42,10 +42,6 @@ export function validateCreateWorkOrderDraft(
     errors.push('La superficie realizada debe ser mayor a 0.')
   }
 
-  if (payload.items.length === 0) {
-    errors.push('Debes agregar al menos un insumo.')
-  }
-
   const usedSupplyIds = new Set<number>()
 
   for (const item of payload.items) {

@@ -56,10 +56,6 @@ export function validateCreateBatchWorkOrderDraft(
       errors.push(`Falta completar superficie para el lote ${lot.lot_id}.`)
     }
 
-    if (lot.items.length === 0) {
-      errors.push(`Falta completar al menos un insumo para el lote ${lot.lot_id}.`)
-    }
-
 
     const usedSupplyIds = new Set<number>()
 

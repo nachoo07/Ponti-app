@@ -42,12 +42,12 @@ export function buildCreateWorkOrderDraftPayload({
   supplyRows,
 }: BuildCreateWorkOrderDraftPayloadParams): CreateWorkOrderDraftPayload {
   const validItems = supplyRows
-    .filter((row) => row.supply_id !== '')
-    .map((row) => ({
-      supply_id: row.supply_id as number,
-      total_used: row.total_used,
-      final_dose: row.final_dose.replace(',', '.'),
-    }))
+  .filter((row) => row.supply_id !== '' || row.total_used || row.final_dose)
+  .map((row) => ({
+    supply_id: row.supply_id === '' ? 0 : row.supply_id,
+    total_used: row.total_used,
+    final_dose: row.final_dose.replace(',', '.'),
+  }))
 
   const validInvestorSplits = splitContribution
     ? investorSplits

@@ -24,6 +24,7 @@ export function useWorkOrderWorkspace({
   initialProjectId,
 }: UseWorkOrderWorkspaceParams = {}) {
 
+  const [workspaceVersion, setWorkspaceVersion] = useState(0)
   const [customers, setCustomers] = useState<Customer[]>([])
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(false)
   const [customersError, setCustomersError] = useState<string | null>(null)
@@ -82,7 +83,7 @@ export function useWorkOrderWorkspace({
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [workspaceVersion])
 
 
   useEffect(() => {
@@ -272,7 +273,7 @@ export function useWorkOrderWorkspace({
     onProjectChange?.()
   }
 
-    function resetWorkspaceSelection() {
+  function resetWorkspaceSelection() {
     setSelectedCustomerId('')
     setProjects([])
     setProjectsError(null)
@@ -285,6 +286,21 @@ export function useWorkOrderWorkspace({
     setLabors([])
     setLaborsError(null)
   }
+
+  useEffect(() => {
+    function handleTenantChanged() {
+      setCustomers([])
+      setCustomersError(null)
+      resetWorkspaceSelection()
+      setWorkspaceVersion((current) => current + 1)
+    }
+
+    window.addEventListener('ponti:tenant-changed', handleTenantChanged)
+
+    return () => {
+      window.removeEventListener('ponti:tenant-changed', handleTenantChanged)
+    }
+  }, [])
 
   return {
     customers,

@@ -139,6 +139,49 @@
   gap: 12px;
 }
 
+.tenantBadge,
+.tenantSelect {
+  min-height: 44px;
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  background: rgba(248, 250, 252, 0.78);
+  box-shadow: var(--shadow-xs);
+}
+
+.tenantBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 14px;
+  color: var(--color-text);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.tenantSelect {
+  display: grid;
+  gap: 2px;
+  padding: 7px 12px;
+}
+
+.tenantSelect span {
+  color: var(--color-text-muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.tenantSelect select {
+  width: 160px;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-weight: 700;
+  outline: none;
+}
+
 .userInfo {
   display: grid;
   gap: 2px;
@@ -259,6 +302,15 @@
   }
 
   .userInfo {
+    width: 100%;
+  }
+
+  .tenantBadge,
+  .tenantSelect {
+    width: 100%;
+  }
+
+  .tenantSelect select {
     width: 100%;
   }
 }

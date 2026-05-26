@@ -21,6 +21,8 @@ Copiá `api/.env.example` a `api/.env` y completá:
 - `X_API_KEY`
 - `IDENTITY_PLATFORM_API_KEY`
 - `IDENTITY_PLATFORM_PROJECT_ID`
+- `LOCAL_DEV_AUTH` (opcional, solo local/test)
+- `LOCAL_DEV_PASSWORD` (opcional, valida password cuando `LOCAL_DEV_AUTH=1`)
 
 ### UI
 
@@ -38,6 +40,9 @@ Si no se define, el frontend usa `/api/v1`. Eso funciona bien cuando UI y API se
 cd api
 npm install
 npm run build
+LOCAL_DEV_AUTH=1 \
+BASE_MANAGER_API=http://localhost:8080/api/v1 \
+X_API_KEY=abc123secreta \
 npm run dev
 ```
 

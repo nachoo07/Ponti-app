@@ -7,6 +7,7 @@ import authRoutes from './routes/auth.js'
 import campaignsRoutes from './routes/campaigns.js'
 import customersRoutes from './routes/customers.js'
 import laborsRoutes from './routes/labors.js'
+import meRoutes from './routes/me.js'
 import projectsRoutes from './routes/projects.js'
 import suppliesRoutes from './routes/supplies.js'
 import stockRoutes from './routes/stock.js'
@@ -33,6 +34,7 @@ export function createApp() {
   app.use('/api/v1/campaigns', campaignsRoutes)
   app.use('/api/v1/customers', customersRoutes)
   app.use('/api/v1/labors', laborsRoutes)
+  app.use('/api/v1/me', meRoutes)
   app.use('/api/v1/projects', projectsRoutes)
   app.use('/api/v1/supplies', suppliesRoutes)
   app.use('/api/v1/stock', stockRoutes)

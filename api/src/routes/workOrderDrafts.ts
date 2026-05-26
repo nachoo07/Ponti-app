@@ -1,22 +1,8 @@
-import type { Request } from 'express'
 import { Router } from 'express'
-import { config } from '../config.js'
 import { managerApi } from '../services/http.js'
+import { getManagerHeaders } from './managerHeaders.js'
 
 const router = Router()
-
-function getManagerHeaders(req: Request) {
-  const authorization = req.header('Authorization')
-
-  if (!authorization) {
-    return null
-  }
-
-  return {
-    Authorization: authorization,
-    'X-API-KEY': config.xApiKey,
-  }
-}
 
 router.get('/digital/groups', async (req, res) => {
   const headers = getManagerHeaders(req)

@@ -1,10 +1,12 @@
 import { getSession } from '../../entities/session/model/session.store'
+import { getTenantId } from '../../entities/tenant/model/tenant.store'
 import { API_BASE_URL } from '../config/api'
 import { refreshSession } from './auth'
 
 type RequestOptions = Omit<RequestInit, 'headers'> & {
   headers?: HeadersInit
   requiresAuth?: boolean
+  skipTenant?: boolean
 }
 
 type ApiErrorPayload = {
@@ -54,7 +56,7 @@ function getApiErrorMessage(status: number): string {
 }
 
 async function performRequest(path: string, options: RequestOptions = {}): Promise<Response> {
-  const { headers, requiresAuth = true, ...requestInit } = options
+  const { headers, requiresAuth = true, skipTenant = false, ...requestInit } = options
   const nextHeaders = buildHeaders(headers)
 
   if (requiresAuth) {
@@ -65,6 +67,14 @@ async function performRequest(path: string, options: RequestOptions = {}): Promi
     }
 
     nextHeaders.set('Authorization', `Bearer ${session.accessToken}`)
+
+    if (!skipTenant) {
+      const tenantId = getTenantId()
+
+      if (tenantId) {
+        nextHeaders.set('X-Tenant-Id', tenantId)
+      }
+    }
   }
 
   return fetch(buildUrl(path), {

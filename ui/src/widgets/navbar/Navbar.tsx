@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../app/providers/AuthContext'
+import { useTenant } from '../../app/providers/TenantContext'
 import styles from './Navbar.module.css'
 
 function getPageTitle(pathname: string) {
@@ -23,8 +24,10 @@ export function Navbar() {
   const navigate = useNavigate()
   const location = useLocation()
   const { isAuthenticated, session, logout } = useAuth()
+  const { tenants, tenantId, loading: isLoadingTenant, setTenantId } = useTenant()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const pageTitle = getPageTitle(location.pathname)
+  const currentTenant = tenants.find((tenant) => tenant.id === tenantId)
 
   function handleLogout() {
     logout()
@@ -33,6 +36,11 @@ export function Navbar() {
   }
 
   function handleNavigate() {
+    setIsMenuOpen(false)
+  }
+
+  function handleTenantChange(value: string) {
+    setTenantId(value)
     setIsMenuOpen(false)
   }
 
@@ -106,6 +114,25 @@ export function Navbar() {
 
           {isAuthenticated ? (
             <div className={styles.userSection}>
+              {tenants.length > 1 ? (
+                <label className={styles.tenantSelect}>
+                  <span>Workspace</span>
+                  <select
+                    value={tenantId}
+                    disabled={isLoadingTenant}
+                    onChange={(event) => handleTenantChange(event.target.value)}
+                  >
+                    {tenants.map((tenant) => (
+                      <option key={tenant.id} value={tenant.id}>
+                        {tenant.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : currentTenant ? (
+                <span className={styles.tenantBadge}>{currentTenant.name}</span>
+              ) : null}
+
               <span className={styles.userInfo}>
                 <span className={styles.userLabel}>Sesión activa</span>
                 <strong>{session?.user.name || session?.user.email || 'Usuario autenticado'}</strong>

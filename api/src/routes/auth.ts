@@ -1,3 +1,4 @@
+import type { Response } from 'express'
 import { Router } from 'express'
 import { config } from '../config.js'
 import { identityApi, secureTokenApi } from '../services/http.js'
@@ -14,11 +15,90 @@ type RefreshResponse = {
   refresh_token: string
 }
 
+type LocalTokenPayload = {
+  sub: string
+  email: string
+  Username: string
+  ID: number
+  Rol: number
+  iat: number
+  exp: number
+  token_use: 'access' | 'refresh'
+}
+
+function normalizeLoginIdentifier(value: string): string {
+  const normalizedValue = String(value || '').trim()
+
+  if (!normalizedValue) {
+    return ''
+  }
+
+  return normalizedValue.includes('@') ? normalizedValue : `${normalizedValue}@ponti.local`
+}
+
+function encodeBase64Url(value: unknown): string {
+  return Buffer.from(JSON.stringify(value)).toString('base64url')
+}
+
+function createUnsignedJwt(payload: LocalTokenPayload): string {
+  return `${encodeBase64Url({ alg: 'none', typ: 'JWT' })}.${encodeBase64Url(payload)}.`
+}
+
+function decodeUnsignedJwtPayload(token: string): LocalTokenPayload | null {
+  const [, payload] = String(token || '').split('.')
+
+  if (!payload) {
+    return null
+  }
+
+  try {
+    return JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as LocalTokenPayload
+  } catch {
+    return null
+  }
+}
+
+function createLocalTokenPair(email: string): RefreshResponse {
+  const now = Math.floor(Date.now() / 1000)
+  const username = email.split('@')[0] || 'local-dev-user'
+  const numericUserId = Number(config.localDevUserId) || 1
+  const basePayload = {
+    sub: `local:${email}`,
+    email,
+    Username: username,
+    ID: numericUserId,
+    Rol: 1,
+    iat: now,
+  }
+
+  return {
+    access_token: createUnsignedJwt({
+      ...basePayload,
+      exp: now + 60 * 60,
+      token_use: 'access',
+    }),
+    refresh_token: createUnsignedJwt({
+      ...basePayload,
+      exp: now + 30 * 24 * 60 * 60,
+      token_use: 'refresh',
+    }),
+  }
+}
+
+function respondWithLocalLogin(res: Response, email: string) {
+  res.status(200).json({
+    success: true,
+    message: 'Operacion exitosa',
+    data: createLocalTokenPair(email),
+  })
+}
+
 router.post('/login', async (req, res) => {
-  const { email, password } = req.body as {
+  const { email: rawEmail, password } = req.body as {
     email?: string
     password?: string
   }
+  const email = normalizeLoginIdentifier(rawEmail ?? '')
 
   if (!email || !password) {
     res.status(400).json({
@@ -30,6 +110,20 @@ router.post('/login', async (req, res) => {
   }
 
   try {
+    if (config.allowLocalDevAuth) {
+      if (config.localDevPassword && password !== config.localDevPassword) {
+        res.status(401).json({
+          type: 'UNAUTHORIZED',
+          code: 401,
+          message: 'Credenciales locales invalidas',
+        })
+        return
+      }
+
+      respondWithLocalLogin(res, email)
+      return
+    }
+
     const response = await identityApi.post<LoginResponse>(
       `/accounts:signInWithPassword?key=${config.identityPlatformApiKey}`,
       {
@@ -81,6 +175,26 @@ router.get('/access-token', async (req, res) => {
   }
 
   try {
+    if (config.allowLocalDevAuth) {
+      const payload = decodeUnsignedJwtPayload(refreshToken)
+
+      if (
+        !payload ||
+        payload.token_use !== 'refresh' ||
+        payload.exp * 1000 <= Date.now()
+      ) {
+        res.status(401).json({
+          type: 'UNAUTHORIZED',
+          code: 401,
+          message: 'Refresh token invalido',
+        })
+        return
+      }
+
+      res.status(200).json(createLocalTokenPair(payload.email))
+      return
+    }
+
     const response = await secureTokenApi.post(
       `/token?key=${config.identityPlatformApiKey}`,
       new URLSearchParams({

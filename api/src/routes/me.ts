@@ -4,7 +4,7 @@ import { getManagerHeaders } from './managerHeaders.js'
 
 const router = Router()
 
-router.get('', async (req, res) => {
+router.get('/context', async (req, res) => {
   const headers = getManagerHeaders(req)
 
   if (!headers) {
@@ -12,15 +12,8 @@ router.get('', async (req, res) => {
     return
   }
 
-  const page = Number(req.query.page ?? 1)
-  const perPage = Number(req.query.per_page ?? 100)
-
   try {
-    const response = await managerApi.get('/customers', {
-      params: {
-        page,
-        per_page: perPage,
-      },
+    const response = await managerApi.get('/me/context', {
       headers,
     })
 
@@ -28,7 +21,7 @@ router.get('', async (req, res) => {
   } catch (error: any) {
     res.status(error?.response?.status ?? 500).json(
       error?.response?.data ?? {
-        message: 'No se pudieron obtener los clientes',
+        message: 'No se pudo obtener el contexto de usuario',
       },
     )
   }

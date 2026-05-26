@@ -27,11 +27,11 @@ jobs:
       ARTIFACT_REGISTRY: ${{ vars.ARTIFACT_REGISTRY || 'cloud-run-source-deploy' }}
       IMAGE_NAME: ${{ vars.IMAGE_NAME || 'ponti-mobile' }}
       SERVICE_NAME: ${{ vars.SERVICE_NAME_DEV || 'ponti-mobile' }}
+      BACKEND_SERVICE_NAME: ${{ vars.BACKEND_SERVICE_NAME_DEV || 'ponti-backend' }}
       HOSTING_SITE_ID: ${{ vars.FIREBASE_HOSTING_SITE_DEV || 'ponti-mobile-dev' }}
       CLOUD_RUN_SERVICE_ACCOUNT: ${{ vars.CLOUD_RUN_SERVICE_ACCOUNT_DEV || 'cloudrun-sa@new-ponti-dev.iam.gserviceaccount.com' }}
       WIF_PROVIDER: ${{ vars.WIF_PROVIDER_DEV }}
       WIF_SERVICE_ACCOUNT: ${{ vars.WIF_SERVICE_ACCOUNT_DEV }}
-      BASE_MANAGER_API: ${{ vars.BASE_MANAGER_API_DEV || 'https://ponti-backend-vjhlkdxpoa-uc.a.run.app/api/v1' }}
       IDENTITY_PLATFORM_PROJECT_ID: ${{ vars.IDENTITY_PLATFORM_PROJECT_ID_DEV || 'new-ponti-dev' }}
       SECRET_X_API_KEY_NAME: x-api-key-dev
       SECRET_IDENTITY_PLATFORM_API_KEY_NAME: identity-platform-api-key-dev
@@ -67,6 +67,24 @@ jobs:
       - name: Configure Docker auth
         run: gcloud auth configure-docker "${{ env.GCP_REGION }}-docker.pkg.dev" --quiet
 
+      - name: Resolve canonical backend API URL
+        id: backend
+        run: |
+          backend_url="$(gcloud run services describe "$BACKEND_SERVICE_NAME" \
+            --project="$GCP_PROJECT_ID" \
+            --region="$GCP_REGION" \
+            --format='value(status.url)')"
+          if [[ -z "$backend_url" ]]; then
+            echo "ERROR: no se pudo resolver status.url del backend '$BACKEND_SERVICE_NAME'."
+            exit 1
+          fi
+          base_manager_api="${backend_url%/}/api/v1"
+          if [[ "$base_manager_api" == *"---"* ]]; then
+            echo "ERROR: BASE_MANAGER_API no puede apuntar a URL taggeada: $base_manager_api"
+            exit 1
+          fi
+          echo "BASE_MANAGER_API=$base_manager_api" >> "$GITHUB_OUTPUT"
+
       - name: Build y push imagen API
         env:
           IMAGE_TAG: ${{ github.sha }}
@@ -78,7 +96,7 @@ jobs:
 
       - name: Deploy a Cloud Run (DEV)
         run: |
-          ENV_VARS="NODE_ENV=production,BASE_MANAGER_API=${BASE_MANAGER_API},IDENTITY_PLATFORM_PROJECT_ID=${IDENTITY_PLATFORM_PROJECT_ID}"
+          ENV_VARS="NODE_ENV=production,BASE_MANAGER_API=${{ steps.backend.outputs.BASE_MANAGER_API }},IDENTITY_PLATFORM_PROJECT_ID=${IDENTITY_PLATFORM_PROJECT_ID}"
           gcloud run deploy "$SERVICE_NAME" \
             --project="$GCP_PROJECT_ID" \
             --region="$GCP_REGION" \
@@ -117,9 +135,10 @@ jobs:
             --project="$GCP_PROJECT_ID" \
             --region="$GCP_REGION" \
             --format='json')"
-          SERVICE_JSON="$service_json" python3 - <<'PY'
+          SERVICE_JSON="$service_json" EXPECTED_BASE_MANAGER_API="${{ steps.backend.outputs.BASE_MANAGER_API }}" python3 - <<'PY'
           import json, os, sys
           svc = json.loads(os.environ["SERVICE_JSON"])
+          expected_base_manager_api = os.environ["EXPECTED_BASE_MANAGER_API"]
           traffic = svc.get("status", {}).get("traffic", [])
           ok_latest = any(
               t.get("latestRevision") is True and int(t.get("percent", 0)) == 100
@@ -129,6 +148,15 @@ jobs:
               print("ERROR: el tráfico no está 100% en latestRevision.")
               sys.exit(1)
           envs = svc.get("spec", {}).get("template", {}).get("spec", {}).get("containers", [{}])[0].get("env", [])
+          deployed_base_manager_api = next((env.get("value", "") for env in envs if env.get("name") == "BASE_MANAGER_API"), "")
+          if not deployed_base_manager_api:
+              print("ERROR: BASE_MANAGER_API quedó vacío en deploy.")
+              sys.exit(1)
+          if deployed_base_manager_api != expected_base_manager_api:
+              print("ERROR: BASE_MANAGER_API desplegada no coincide con la URL canónica resuelta.")
+              print(f"Esperada: {expected_base_manager_api}")
+              print(f"Actual:   {deployed_base_manager_api}")
+              sys.exit(1)
           bad = []
           for env in envs:
               if env.get("name") == "BASE_MANAGER_API":

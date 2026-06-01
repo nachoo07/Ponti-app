@@ -29,6 +29,15 @@ export function createApp() {
     res.status(200).json({ ok: true })
   })
 
+  app.get('/api/v1/version', (_req, res) => {
+    res.status(200).json({
+      service: process.env.SERVICE_NAME ?? 'ponti-mobile',
+      version: process.env.SERVICE_VERSION ?? 'local',
+      gitSha: process.env.SERVICE_GIT_SHA ?? '',
+      buildTime: process.env.SERVICE_BUILD_TIME ?? '',
+    })
+  })
+
   app.use('/api/v1/auth', authRoutes)
   app.use('/api/v1/campaigns', campaignsRoutes)
   app.use('/api/v1/customers', customersRoutes)

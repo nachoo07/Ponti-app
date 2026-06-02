@@ -3,6 +3,7 @@ import express from 'express'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { logger } from './logger.js'
 import authRoutes from './routes/auth.js'
 import campaignsRoutes from './routes/campaigns.js'
 import customersRoutes from './routes/customers.js'
@@ -20,6 +21,26 @@ export function createApp() {
 
   app.use(cors())
   app.use(express.json())
+
+  app.use((req, res, next) => {
+    const startedAt = Date.now()
+
+    res.on('finish', () => {
+      // No logueamos /health para no ensuciar (lo pega el healthcheck de Cloud Run).
+      if (req.path === '/health') {
+        return
+      }
+
+      logger.info('http_request', {
+        method: req.method,
+        path: req.originalUrl,
+        status: res.statusCode,
+        durationMs: Date.now() - startedAt,
+      })
+    })
+
+    next()
+  })
 
   if (hasFrontendBundle) {
     app.use(express.static(frontendPath))

@@ -31,3 +31,7 @@ pnpm-debug.log*
 coverage/
 api/coverage/
 ui/coverage/
+
+# python cache (scripts/release)
+__pycache__/
+*.pyc

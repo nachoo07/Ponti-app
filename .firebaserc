@@ -1,0 +1,25 @@
+{
+  "targets": {
+    "new-ponti-dev": {
+      "hosting": {
+        "frontend": [
+          "ponti-mobile-dev"
+        ]
+      }
+    },
+    "new-ponti-stg": {
+      "hosting": {
+        "frontend": [
+          "ponti-mobile-stg"
+        ]
+      }
+    },
+    "new-ponti-prod": {
+      "hosting": {
+        "frontend": [
+          "ponti-mobile-prod"
+        ]
+      }
+    }
+  }
+}

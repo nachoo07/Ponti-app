@@ -1,0 +1,77 @@
+name: CI PR (Mobile)
+
+on:
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - "api/**"
+      - "ui/**"
+      - "Dockerfile.api"
+      - "scripts/**"
+      - ".github/workflows/ci-pr.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ponti-mobile-ci-pr-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.19.0"
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      - name: Install UI dependencies
+        run: npm --prefix ui ci
+
+      - name: Lint UI
+        run: npm --prefix ui run lint
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.19.0"
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      - name: Install UI dependencies
+        run: npm --prefix ui ci
+
+      - name: Build UI (incluye typecheck con tsc -b)
+        run: npm --prefix ui run build
+
+  build-api:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.19.0"
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+
+      - name: Install API dependencies
+        run: npm --prefix api ci
+
+      - name: Build API (tsc)
+        run: npm --prefix api run build

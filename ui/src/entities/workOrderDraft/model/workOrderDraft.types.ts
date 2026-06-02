@@ -27,6 +27,22 @@ export type CreateWorkOrderDraftPayload = {
   items: WorkOrderDraftItemPayload[]
 }
 
+export type UpdateWorkOrderDraftGroupPayload = {
+  number?: string
+  date: string
+  customer_id: number
+  project_id: number
+  campaign_id?: number | null
+  field_id: number
+  crop_id: number
+  labor_id: number
+  contractor: string
+  observations: string
+  investor_id: number
+  investor_splits?: WorkOrderDraftInvestorSplitPayload[]
+  items: WorkOrderDraftItemPayload[]
+}
+
 export type BatchPreviewDigitalWorkOrderNumberPayload = {
   project_id: number
   number?: string

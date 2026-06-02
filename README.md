@@ -53,6 +53,30 @@ npm run dev
 
 ## Deploy
 
-- Publicá con Node `20.19.0+`.
-- Si UI y API viven en dominios distintos, definí `VITE_API_BASE_URL` con la URL pública del BFF, por ejemplo `https://api.midominio.com/api/v1`.
-- Si UI y API viven bajo el mismo dominio, mantené el default `/api/v1` y resolvelo con proxy/reverse proxy.
+La app se despliega en GCP: el BFF (`api/`) a **Cloud Run** y la UI (`ui/`) a
+**Firebase Hosting**, con un proyecto GCP por ambiente.
+
+| Ambiente | Trigger | Proyecto GCP | URL UI |
+|---|---|---|---|
+| dev | push a `develop` | `new-ponti-dev` | https://ponti-mobile-dev.web.app |
+| stg | push a `main` | `new-ponti-stg` | https://ponti-mobile-stg.web.app |
+| prod | `deploy-prod` manual (promueve un SHA de stg) | `new-ponti-prod` | https://ponti-mobile-prod.web.app |
+
+Flujo: `develop`→dev, `main`→stg, luego `approve-staging` (aprobación QA) y
+`deploy-prod` promueve la **misma imagen + artefacto** aprobados de stg a prod.
+Hay también `rollback-staging` / `rollback-prod`.
+
+Workflows en [.github/workflows/](.github/workflows/). El setup de los ambientes
+(provisión GCP, variables/secrets de GitHub, Environments) está documentado en
+[docs/SETUP_ENVIRONMENTS.md](docs/SETUP_ENVIRONMENTS.md).
+
+### Notas de runtime
+
+- Node `20.19.0+`. El BFF escucha en el puerto `PORT` (Cloud Run usa 8080).
+- `BASE_MANAGER_API` se resuelve dinámicamente desde el Cloud Run del backend
+  (`ponti-backend`) de cada proyecto; `X_API_KEY` e `IDENTITY_PLATFORM_API_KEY`
+  se inyectan desde **Secret Manager**.
+- La UI usa por default `/api/v1` (mismo origen, resuelto por el rewrite de
+  Firebase Hosting). Definí `VITE_API_BASE_URL` sólo si la apuntás a un BFF en
+  otro dominio.
+- `GET /api/v1/version` expone `service`, `version`, `gitSha` y `buildTime` del deploy.

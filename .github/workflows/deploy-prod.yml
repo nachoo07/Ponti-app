@@ -1,0 +1,347 @@
+name: Deploy PROD (promote STAGING artifact)
+
+on:
+  workflow_dispatch:
+    inputs:
+      staging_sha:
+        description: "SHA a promover desde STAGING (imagen tag = sha)"
+        required: true
+      release_version:
+        description: "Version humana opcional (ej: v0.8.2)"
+        required: false
+        default: ""
+      reason:
+        description: "Motivo / ticket (texto libre)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+  id-token: write
+  deployments: write
+  actions: read
+
+concurrency:
+  group: ponti-mobile-deploy-prod
+  cancel-in-progress: false
+
+env:
+  REGION: ${{ vars.GCP_REGION_PROD || 'us-central1' }}
+  REGISTRY: us-central1-docker.pkg.dev
+  REPOSITORY: ${{ vars.ARTIFACT_REGISTRY || 'cloud-run-source-deploy' }}
+  REQUIRE_AUTH_SMOKE: "0"
+  HOSTING_SITE_ID: ${{ vars.FIREBASE_HOSTING_SITE_PROD || 'ponti-mobile-prod' }}
+  SECRET_X_API_KEY_NAME: x-api-key-prod
+  SECRET_IDENTITY_PLATFORM_API_KEY_NAME: identity-platform-api-key-prod
+
+jobs:
+  promote-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: prod
+    env:
+      # STAGING (source image)
+      GCP_PROJECT_ID_STG: ${{ vars.GCP_PROJECT_ID_STG }}
+      WIF_PROVIDER_STG: ${{ vars.WIF_PROVIDER_STG }}
+      WIF_SERVICE_ACCOUNT_STG: ${{ vars.WIF_SERVICE_ACCOUNT_STG }}
+      SERVICE_NAME_STG: ${{ vars.SERVICE_NAME_STG || 'ponti-mobile' }}
+
+      # PROD (target deploy)
+      GCP_PROJECT_ID_PROD: ${{ vars.GCP_PROJECT_ID_PROD }}
+      WIF_PROVIDER_PROD: ${{ vars.WIF_PROVIDER_PROD }}
+      WIF_SERVICE_ACCOUNT_PROD: ${{ vars.WIF_SERVICE_ACCOUNT_PROD }}
+      CLOUD_RUN_SERVICE_ACCOUNT_PROD: ${{ vars.CLOUD_RUN_SERVICE_ACCOUNT_PROD || 'cloudrun-sa@new-ponti-prod.iam.gserviceaccount.com' }}
+      SERVICE_NAME_PROD: ${{ vars.SERVICE_NAME_PROD || 'ponti-mobile' }}
+
+      BACKEND_SERVICE_NAME_PROD: ${{ vars.CLOUD_RUN_SERVICE_BACKEND_PROD || 'ponti-backend' }}
+
+    steps:
+      - name: Validate staging SHA input
+        env:
+          STAGING_SHA: ${{ github.event.inputs.staging_sha }}
+        run: |
+          if [[ ! "$STAGING_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "ERROR: staging_sha debe ser un SHA completo de 40 caracteres hexadecimales."
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.staging_sha }}
+
+      - name: Resolve deploy SHA
+        env:
+          STAGING_SHA: ${{ github.event.inputs.staging_sha }}
+        run: |
+          set -euo pipefail
+          deploy_sha="$(git rev-parse HEAD)"
+          if [[ ! "$deploy_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "ERROR: invalid deploy SHA: $deploy_sha"
+            exit 1
+          fi
+          if [[ "$deploy_sha" != "$STAGING_SHA" ]]; then
+            echo "ERROR: checkout SHA no coincide con staging_sha."
+            echo "       staging_sha=$STAGING_SHA"
+            echo "       checkout_sha=$deploy_sha"
+            exit 1
+          fi
+          echo "DEPLOY_SHA=$deploy_sha" >> "$GITHUB_ENV"
+          echo "DEPLOY_SHORT_SHA=${deploy_sha::12}" >> "$GITHUB_ENV"
+
+      - name: Validate STAGING approval
+        id: approved
+        run: python3 scripts/release/deployments.py resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESOLVE_ENV: staging-approved
+          RESOLVE_LABELS: QA_APPROVED
+          RESOLVE_SHA: ${{ github.event.inputs.staging_sha }}
+
+      - name: Auth GCP (STAGING - pull Artifact)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER_STG }}
+          service_account: ${{ env.WIF_SERVICE_ACCOUNT_STG }}
+
+      - name: Setup gcloud (STAGING)
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID_STG }}
+
+      - name: "Guardrail: staging SHA is currently deployed in STAGING"
+        env:
+          STAGING_SHA: ${{ github.event.inputs.staging_sha }}
+        run: |
+          deployed_image="$(gcloud run services describe "$SERVICE_NAME_STG" \
+            --project="$GCP_PROJECT_ID_STG" \
+            --region="${REGION}" \
+            --format='value(spec.template.spec.containers[0].image)')"
+          if [[ -z "$deployed_image" ]]; then
+            echo "ERROR: no se pudo resolver la imagen actualmente desplegada en STAGING."
+            exit 1
+          fi
+          deployed_tag="${deployed_image##*:}"
+          if [[ "$deployed_tag" != "$STAGING_SHA" ]]; then
+            echo "ERROR: staging_sha no coincide con la imagen desplegada en STAGING."
+            echo "       staging_sha=$STAGING_SHA"
+            echo "       deployed_image=$deployed_image"
+            exit 1
+          fi
+          echo "STAGING OK: $deployed_image"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.19.0"
+
+      - name: Configure Docker for Artifact Registry (STAGING)
+        run: gcloud auth configure-docker "${REGISTRY}" --quiet
+
+      - name: Pull imagen de STAGING
+        env:
+          STAGING_SHA: ${{ github.event.inputs.staging_sha }}
+        run: |
+          src_image="${REGISTRY}/${GCP_PROJECT_ID_STG}/${REPOSITORY}/${SERVICE_NAME_STG}:${STAGING_SHA}"
+          echo "SRC_IMAGE=$src_image" >> "$GITHUB_ENV"
+          docker pull "$src_image"
+
+      - name: Auth GCP (PROD - push + deploy)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER_PROD }}
+          service_account: ${{ env.WIF_SERVICE_ACCOUNT_PROD }}
+
+      - name: Setup gcloud (PROD)
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID_PROD }}
+
+      - name: Build metadata
+        env:
+          INPUT_RELEASE_VERSION: ${{ github.event.inputs.release_version }}
+        run: |
+          build_time="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          release_version="${INPUT_RELEASE_VERSION:-prod-${DEPLOY_SHORT_SHA}}"
+          echo "SERVICE_GIT_SHA=${DEPLOY_SHA}" >> "$GITHUB_ENV"
+          echo "SERVICE_BUILD_TIME=$build_time" >> "$GITHUB_ENV"
+          echo "RELEASE_SERVICE_VERSION=${release_version}" >> "$GITHUB_ENV"
+
+      - name: Configure Docker for Artifact Registry (PROD)
+        run: gcloud auth configure-docker "${REGISTRY}" --quiet
+
+      - name: Push imagen a PROD (retag)
+        env:
+          STAGING_SHA: ${{ github.event.inputs.staging_sha }}
+        run: |
+          dst_sha="${REGISTRY}/${GCP_PROJECT_ID_PROD}/${REPOSITORY}/${SERVICE_NAME_PROD}:${STAGING_SHA}"
+          dst_prod="${REGISTRY}/${GCP_PROJECT_ID_PROD}/${REPOSITORY}/${SERVICE_NAME_PROD}:prod"
+          docker tag "$SRC_IMAGE" "$dst_sha"
+          docker tag "$SRC_IMAGE" "$dst_prod"
+          docker push "$dst_sha"
+          docker push "$dst_prod"
+          echo "IMAGE=$dst_sha" >> "$GITHUB_ENV"
+
+      - name: Download approved UI artifact
+        run: |
+          rm -rf ui/dist /tmp/ponti-ui-artifact
+          mkdir -p ui/dist /tmp/ponti-ui-artifact
+          gh run download "${{ steps.approved.outputs.ui_artifact_run_id }}" \
+            -n "${{ steps.approved.outputs.ui_artifact_name }}" \
+            -D /tmp/ponti-ui-artifact
+          tar -xzf "/tmp/ponti-ui-artifact/${{ steps.approved.outputs.ui_artifact_name }}.tgz" -C ui/dist
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Resolve canonical backend API URL (PROD)
+        id: backend
+        run: |
+          backend_service_name="${BACKEND_SERVICE_NAME_PROD:-ponti-backend}"
+          backend_url="$(gcloud run services describe "$backend_service_name" \
+            --project="${GCP_PROJECT_ID_PROD}" \
+            --region="${REGION}" \
+            --format='value(status.url)')"
+          if [[ -z "$backend_url" ]]; then
+            echo "ERROR: no se pudo resolver status.url del backend PROD '$backend_service_name'."
+            exit 1
+          fi
+          base_manager_api="${backend_url%/}/api/v1"
+          if [[ "$base_manager_api" == *"---"* ]]; then
+            echo "ERROR: BASE_MANAGER_API PROD no puede apuntar a URL taggeada: $base_manager_api"
+            exit 1
+          fi
+          echo "BASE_MANAGER_API=$base_manager_api" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy API to Cloud Run (PROD)
+        run: |
+          gcloud run deploy "${SERVICE_NAME_PROD}" \
+            --project="${GCP_PROJECT_ID_PROD}" \
+            --region="${REGION}" \
+            --image="${IMAGE}" \
+            --service-account="${CLOUD_RUN_SERVICE_ACCOUNT_PROD}" \
+            --min-instances=2 \
+            --allow-unauthenticated \
+            --set-env-vars="NODE_ENV=production,SERVICE_NAME=${SERVICE_NAME_PROD},SERVICE_VERSION=${RELEASE_SERVICE_VERSION},SERVICE_GIT_SHA=${SERVICE_GIT_SHA},SERVICE_BUILD_TIME=${SERVICE_BUILD_TIME},BASE_MANAGER_API=${{ steps.backend.outputs.BASE_MANAGER_API }},IDENTITY_PLATFORM_PROJECT_ID=${GCP_PROJECT_ID_PROD}" \
+            --set-secrets="X_API_KEY=${SECRET_X_API_KEY_NAME}:latest,IDENTITY_PLATFORM_API_KEY=${SECRET_IDENTITY_PLATFORM_API_KEY_NAME}:latest"
+
+      - name: "Guardrail: verify BASE_MANAGER_API detagged (PROD)"
+        run: |
+          service_json="$(gcloud run services describe "${SERVICE_NAME_PROD}" \
+            --project="${GCP_PROJECT_ID_PROD}" \
+            --region="${REGION}" \
+            --format='json')"
+          deployed_base_manager_api="$(SERVICE_JSON="$service_json" python3 - <<'PY'
+          import json, os
+          data = json.loads(os.environ["SERVICE_JSON"])
+          envs = data.get("spec", {}).get("template", {}).get("spec", {}).get("containers", [{}])[0].get("env", [])
+          print(next((e.get("value", "") for e in envs if e.get("name") == "BASE_MANAGER_API"), ""))
+          PY
+          )"
+          if [[ -z "$deployed_base_manager_api" ]]; then
+            echo "ERROR: BASE_MANAGER_API vacío en revisión PROD desplegada."
+            exit 1
+          fi
+          if [[ "$deployed_base_manager_api" == *"---"* ]]; then
+            echo "ERROR: BASE_MANAGER_API PROD quedó taggeada en deploy: $deployed_base_manager_api"
+            exit 1
+          fi
+          if [[ "$deployed_base_manager_api" != "${{ steps.backend.outputs.BASE_MANAGER_API }}" ]]; then
+            echo "ERROR: BASE_MANAGER_API PROD desplegada no coincide con la URL canónica resuelta."
+            echo "Esperada: ${{ steps.backend.outputs.BASE_MANAGER_API }}"
+            echo "Actual:   $deployed_base_manager_api"
+            exit 1
+          fi
+
+      - name: Resolve API URL (PROD)
+        run: |
+          service_url="$(gcloud run services describe "${SERVICE_NAME_PROD}" \
+            --project="${GCP_PROJECT_ID_PROD}" \
+            --region="${REGION}" \
+            --format='value(status.url)')"
+          if [[ -z "$service_url" ]]; then
+            echo "ERROR: no se pudo resolver status.url del servicio PROD."
+            exit 1
+          fi
+          echo "SERVICE_URL=$service_url" >> "$GITHUB_ENV"
+
+      - name: Resolve Cloud Run revision (PROD)
+        run: |
+          revision="$(gcloud run services describe "${SERVICE_NAME_PROD}" \
+            --project="${GCP_PROJECT_ID_PROD}" \
+            --region="${REGION}" \
+            --format='value(status.latestReadyRevisionName)')"
+          echo "CLOUD_RUN_REVISION=$revision" >> "$GITHUB_ENV"
+
+      - name: "Guardrail: deployed PROD image matches promoted SHA"
+        env:
+          STAGING_SHA: ${{ github.event.inputs.staging_sha }}
+        run: |
+          deployed_image="$(gcloud run services describe "$SERVICE_NAME_PROD" \
+            --project="$GCP_PROJECT_ID_PROD" \
+            --region="${REGION}" \
+            --format='value(spec.template.spec.containers[0].image)')"
+          if [[ -z "$deployed_image" ]]; then
+            echo "ERROR: no se pudo resolver la imagen desplegada en PROD."
+            exit 1
+          fi
+          deployed_tag="${deployed_image##*:}"
+          if [[ "$deployed_tag" != "$STAGING_SHA" ]]; then
+            echo "ERROR: PROD no quedó desplegado con el SHA promovido."
+            echo "       staging_sha=$STAGING_SHA"
+            echo "       deployed_image=$deployed_image"
+            exit 1
+          fi
+          echo "PROD OK: $deployed_image"
+
+      - name: Write Firebase target config (PROD)
+        run: |
+          cat > .firebaserc <<EOF
+          {
+            "targets": {
+              "${GCP_PROJECT_ID_PROD}": {
+                "hosting": {
+                  "frontend": [
+                    "${HOSTING_SITE_ID}"
+                  ]
+                }
+              }
+            }
+          }
+          EOF
+
+      - name: Deploy UI to Firebase Hosting (PROD)
+        run: |
+          npx -y firebase-tools@15.16.0 deploy \
+            --only hosting:frontend \
+            --project "${GCP_PROJECT_ID_PROD}" \
+            --non-interactive
+
+      - name: Resolve Hosting URL (PROD)
+        run: echo "HOSTING_URL=https://${HOSTING_SITE_ID}.web.app" >> "$GITHUB_ENV"
+
+      - name: Smoke API health (PROD)
+        run: curl -fsS "$SERVICE_URL/health" >/dev/null
+
+      - name: Smoke release checks (PROD)
+        run: bash ./scripts/smoke_release.sh "$HOSTING_URL"
+        env:
+          REQUIRE_AUTH_SMOKE: ${{ env.REQUIRE_AUTH_SMOKE }}
+
+      - name: Record PROD deployment
+        run: |
+          DEPLOY_DESCRIPTION="Mobile PROD promoted ${DEPLOY_SHA}" \
+          SERVICE_VERSION="$RELEASE_SERVICE_VERSION" \
+          IMAGE_URI="$IMAGE" \
+          python3 scripts/release/deployments.py record
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEPLOY_ENV: prod
+          DEPLOY_STATUS_LABEL: PROD_PROMOTED
+          DEPLOY_STATE: success
+          UI_ARTIFACT_NAME: ${{ steps.approved.outputs.ui_artifact_name }}
+          UI_ARTIFACT_RUN_ID: ${{ steps.approved.outputs.ui_artifact_run_id }}
+
+      - name: Show deployment URLs (PROD)
+        run: |
+          echo "✅ Cloud Run PROD API: $SERVICE_URL"
+          echo "✅ Firebase Hosting PROD: $HOSTING_URL"

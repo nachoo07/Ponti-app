@@ -42,10 +42,6 @@ export function validateCreateWorkOrderDraft(
     errors.push('La superficie realizada debe ser mayor a 0.')
   }
 
-  if (payload.items.length === 0) {
-    errors.push('Debes agregar al menos un insumo.')
-  }
-
   const usedSupplyIds = new Set<number>()
 
   for (const item of payload.items) {
@@ -64,7 +60,7 @@ export function validateCreateWorkOrderDraft(
       errors.push('Todos los insumos deben tener un total utilizado mayor a 0.')
     }
 
-    const finalDose = Number(item.final_dose)
+    const finalDose = Number(item.final_dose?.replace(',', '.'))
     if (!Number.isFinite(finalDose) || finalDose <= 0) {
       errors.push('Todos los insumos deben tener una dosis final mayor a 0.')
     }
@@ -104,4 +100,3 @@ export function validateCreateWorkOrderDraft(
 
   return [...new Set(errors)]
 }
-

@@ -1,5 +1,6 @@
 import cors from 'cors'
 import express from 'express'
+import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import authRoutes from './routes/auth.js'
@@ -14,13 +15,27 @@ import workOrderDraftRoutes from './routes/workOrderDrafts.js'
 export function createApp() {
   const app = express()
   const frontendPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), 'public')
+  const frontendIndex = path.join(frontendPath, 'index.html')
+  const hasFrontendBundle = fs.existsSync(frontendIndex)
 
   app.use(cors())
   app.use(express.json())
-  app.use(express.static(frontendPath))
+
+  if (hasFrontendBundle) {
+    app.use(express.static(frontendPath))
+  }
 
   app.get('/health', (_req, res) => {
     res.status(200).json({ ok: true })
+  })
+
+  app.get('/api/v1/version', (_req, res) => {
+    res.status(200).json({
+      service: process.env.SERVICE_NAME ?? 'ponti-mobile',
+      version: process.env.SERVICE_VERSION ?? 'local',
+      gitSha: process.env.SERVICE_GIT_SHA ?? '',
+      buildTime: process.env.SERVICE_BUILD_TIME ?? '',
+    })
   })
 
   app.use('/api/v1/auth', authRoutes)
@@ -31,9 +46,12 @@ export function createApp() {
   app.use('/api/v1/supplies', suppliesRoutes)
   app.use('/api/v1/stock', stockRoutes)
   app.use('/api/v1/work-order-drafts', workOrderDraftRoutes)
-  app.get(/^(?!\/api\/v1|\/health).*/, (_req, res) => {
-    res.sendFile(path.join(frontendPath, 'index.html'))
-  })
+
+  if (hasFrontendBundle) {
+    app.get(/^(?!\/api\/v1|\/health).*/, (_req, res) => {
+      res.sendFile(frontendIndex)
+    })
+  }
 
   return app
 }

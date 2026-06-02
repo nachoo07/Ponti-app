@@ -1,0 +1,246 @@
+name: Deploy STAGING (Cloud Run + Hosting)
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "api/**"
+      - "ui/**"
+      - "Dockerfile.api"
+      - "scripts/**"
+      - ".github/workflows/deploy-staging.yml"
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Rama o ref a desplegar (default: main)"
+        required: false
+        default: "main"
+
+concurrency:
+  group: ponti-mobile-deploy-staging-${{ github.event.inputs.ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  id-token: write
+  deployments: write
+
+env:
+  REGION: ${{ vars.GCP_REGION || 'us-central1' }}
+  REGISTRY: us-central1-docker.pkg.dev
+  REPOSITORY: ${{ vars.ARTIFACT_REGISTRY || 'cloud-run-source-deploy' }}
+  REQUIRE_AUTH_SMOKE: "0"
+  PROJECT_ID: ${{ vars.GCP_PROJECT_ID_STG || 'new-ponti-stg' }}
+  SERVICE_NAME: ${{ vars.SERVICE_NAME_STG || 'ponti-mobile' }}
+  BACKEND_SERVICE_NAME: ${{ vars.CLOUD_RUN_SERVICE_BACKEND_STG || 'ponti-backend' }}
+  HOSTING_SITE_ID: ${{ vars.FIREBASE_HOSTING_SITE_STG || 'ponti-mobile-stg' }}
+  CLOUD_RUN_SERVICE_ACCOUNT: ${{ vars.CLOUD_RUN_SERVICE_ACCOUNT_STG || 'cloudrun-sa@new-ponti-stg.iam.gserviceaccount.com' }}
+  SECRET_X_API_KEY_NAME: x-api-key-stg
+  SECRET_IDENTITY_PLATFORM_API_KEY_NAME: identity-platform-api-key-stg
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref || github.ref_name }}
+
+      - name: Resolve deploy SHA
+        run: |
+          set -euo pipefail
+          deploy_sha="$(git rev-parse HEAD)"
+          if [[ ! "$deploy_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "ERROR: invalid deploy SHA: $deploy_sha"
+            exit 1
+          fi
+          build_time="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          echo "DEPLOY_SHA=$deploy_sha" >> "$GITHUB_ENV"
+          echo "SERVICE_GIT_SHA=$deploy_sha" >> "$GITHUB_ENV"
+          echo "SERVICE_BUILD_TIME=$build_time" >> "$GITHUB_ENV"
+          echo "RELEASE_SERVICE_VERSION=stg-${deploy_sha::12}" >> "$GITHUB_ENV"
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER_STG }}
+          service_account: ${{ vars.WIF_SERVICE_ACCOUNT_STG }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.19.0"
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      - name: Build UI
+        run: |
+          npm --prefix ui ci
+          npm --prefix ui run build
+
+      - name: Package UI artifact
+        run: |
+          artifact_name="ponti-ui-dist-${DEPLOY_SHA}"
+          tar -czf "/tmp/${artifact_name}.tgz" -C ui/dist .
+          echo "UI_ARTIFACT_NAME=${artifact_name}" >> "$GITHUB_ENV"
+          echo "UI_ARTIFACT_PATH=/tmp/${artifact_name}.tgz" >> "$GITHUB_ENV"
+
+      - name: Upload UI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.UI_ARTIFACT_NAME }}
+          path: ${{ env.UI_ARTIFACT_PATH }}
+          retention-days: 90
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker "${REGISTRY}" --quiet
+
+      - name: Build Docker image (API only)
+        run: |
+          IMAGE_SHA="${REGISTRY}/${PROJECT_ID}/${REPOSITORY}/${SERVICE_NAME}:${DEPLOY_SHA}"
+          IMAGE_STG="${REGISTRY}/${PROJECT_ID}/${REPOSITORY}/${SERVICE_NAME}:stg"
+          docker build -f Dockerfile.api -t "$IMAGE_SHA" .
+          docker tag "$IMAGE_SHA" "$IMAGE_STG"
+          echo "IMAGE_SHA=$IMAGE_SHA" >> "$GITHUB_ENV"
+          echo "IMAGE_STG=$IMAGE_STG" >> "$GITHUB_ENV"
+
+      - name: Resolve canonical backend API URL (STAGING)
+        id: backend
+        run: |
+          backend_url="$(gcloud run services describe "${BACKEND_SERVICE_NAME}" \
+            --project="${PROJECT_ID}" \
+            --region="${REGION}" \
+            --format='value(status.url)')"
+          if [[ -z "$backend_url" ]]; then
+            echo "ERROR: no se pudo resolver status.url del backend STAGING '${BACKEND_SERVICE_NAME}'."
+            exit 1
+          fi
+          base_manager_api="${backend_url%/}/api/v1"
+          if [[ "$base_manager_api" == *"---"* ]]; then
+            echo "ERROR: BASE_MANAGER_API STAGING no puede apuntar a URL taggeada: $base_manager_api"
+            exit 1
+          fi
+          echo "BASE_MANAGER_API=$base_manager_api" >> "$GITHUB_OUTPUT"
+
+      - name: Push Docker image
+        run: |
+          docker push "$IMAGE_SHA"
+          docker push "$IMAGE_STG"
+
+      - name: Deploy API to Cloud Run (STAGING)
+        run: |
+          gcloud run deploy "${SERVICE_NAME}" \
+            --project="${PROJECT_ID}" \
+            --region="${REGION}" \
+            --image="$IMAGE_SHA" \
+            --service-account="${CLOUD_RUN_SERVICE_ACCOUNT}" \
+            --allow-unauthenticated \
+            --set-env-vars="NODE_ENV=production,SERVICE_NAME=${SERVICE_NAME},SERVICE_VERSION=${RELEASE_SERVICE_VERSION},SERVICE_GIT_SHA=${SERVICE_GIT_SHA},SERVICE_BUILD_TIME=${SERVICE_BUILD_TIME},BASE_MANAGER_API=${{ steps.backend.outputs.BASE_MANAGER_API }},IDENTITY_PLATFORM_PROJECT_ID=${PROJECT_ID}" \
+            --set-secrets="X_API_KEY=${SECRET_X_API_KEY_NAME}:latest,IDENTITY_PLATFORM_API_KEY=${SECRET_IDENTITY_PLATFORM_API_KEY_NAME}:latest"
+
+      - name: "Guardrail: verify BASE_MANAGER_API detagged (STAGING)"
+        run: |
+          service_json="$(gcloud run services describe "${SERVICE_NAME}" \
+            --project="${PROJECT_ID}" \
+            --region="${REGION}" \
+            --format='json(spec.template.spec.containers[0].env)')"
+          deployed_base_manager_api="$(SERVICE_JSON="$service_json" python3 - <<'PY'
+          import json, os
+          data = json.loads(os.environ["SERVICE_JSON"])
+          envs = data.get("spec", {}).get("template", {}).get("spec", {}).get("containers", [{}])[0].get("env", [])
+          print(next((e.get("value", "") for e in envs if e.get("name") == "BASE_MANAGER_API"), ""))
+          PY
+          )"
+          if [[ -z "$deployed_base_manager_api" ]]; then
+            echo "ERROR: BASE_MANAGER_API vacío en revisión STAGING desplegada."
+            exit 1
+          fi
+          if [[ "$deployed_base_manager_api" == *"---"* ]]; then
+            echo "ERROR: BASE_MANAGER_API STAGING quedó taggeada en deploy: $deployed_base_manager_api"
+            exit 1
+          fi
+          if [[ "$deployed_base_manager_api" != "${{ steps.backend.outputs.BASE_MANAGER_API }}" ]]; then
+            echo "ERROR: BASE_MANAGER_API STAGING desplegada no coincide con la URL canónica resuelta."
+            echo "Esperada: ${{ steps.backend.outputs.BASE_MANAGER_API }}"
+            echo "Actual:   $deployed_base_manager_api"
+            exit 1
+          fi
+
+      - name: Resolve API URL (STAGING)
+        run: |
+          service_url="$(gcloud run services describe "${SERVICE_NAME}" \
+            --project="${PROJECT_ID}" \
+            --region="${REGION}" \
+            --format='value(status.url)')"
+          if [[ -z "$service_url" ]]; then
+            echo "ERROR: no se pudo resolver status.url del servicio STAGING."
+            exit 1
+          fi
+          echo "SERVICE_URL=$service_url" >> "$GITHUB_ENV"
+
+      - name: Resolve Cloud Run revision (STAGING)
+        run: |
+          revision="$(gcloud run services describe "${SERVICE_NAME}" \
+            --project="${PROJECT_ID}" \
+            --region="${REGION}" \
+            --format='value(status.latestReadyRevisionName)')"
+          echo "CLOUD_RUN_REVISION=$revision" >> "$GITHUB_ENV"
+
+      - name: Write Firebase target config (STAGING)
+        run: |
+          cat > .firebaserc <<EOF
+          {
+            "targets": {
+              "${PROJECT_ID}": {
+                "hosting": {
+                  "frontend": [
+                    "${HOSTING_SITE_ID}"
+                  ]
+                }
+              }
+            }
+          }
+          EOF
+
+      - name: Deploy UI to Firebase Hosting (STAGING)
+        run: |
+          npx -y firebase-tools@15.16.0 deploy \
+            --only hosting:frontend \
+            --project "${PROJECT_ID}" \
+            --non-interactive
+
+      - name: Resolve Hosting URL (STAGING)
+        run: echo "HOSTING_URL=https://${HOSTING_SITE_ID}.web.app" >> "$GITHUB_ENV"
+
+      - name: Smoke API health (STAGING)
+        run: curl -fsS "$SERVICE_URL/health" >/dev/null
+
+      - name: Smoke release checks (STAGING)
+        run: bash ./scripts/smoke_release.sh "$HOSTING_URL"
+        env:
+          REQUIRE_AUTH_SMOKE: ${{ env.REQUIRE_AUTH_SMOKE }}
+
+      - name: Record STAGING deployment
+        run: |
+          DEPLOY_DESCRIPTION="Mobile STAGING smoke OK ${DEPLOY_SHA}" \
+          SERVICE_VERSION="$RELEASE_SERVICE_VERSION" \
+          IMAGE_URI="$IMAGE_SHA" \
+          python3 scripts/release/deployments.py record
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEPLOY_ENV: staging
+          DEPLOY_STATUS_LABEL: SMOKE_OK
+          DEPLOY_STATE: success
+          UI_ARTIFACT_RUN_ID: ${{ github.run_id }}
+
+      - name: Show deployment URLs (STAGING)
+        run: |
+          echo "✅ Cloud Run STAGING API: $SERVICE_URL"
+          echo "✅ Firebase Hosting STAGING: $HOSTING_URL"

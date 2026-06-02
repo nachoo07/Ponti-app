@@ -57,15 +57,15 @@ function roundTo(value: number, decimals: number): number {
 
 function formatDose(value: number): string {
     if (!Number.isFinite(value)) return ''
-    return roundTo(value, 3).toFixed(3).replace(/\.?0+$/, '')
+    return roundTo(value, 4).toFixed(4).replace(/\.?0+$/, '').replace('.', ',')
 }
 
 function formatTotalUsedFromDose(value: number): string {
     if (!Number.isFinite(value)) return ''
-    return roundTo(value, 0).toFixed(2)
+    return roundTo(value, 4).toFixed(4).replace(/\.?0+$/, '')
 }
 
-function formatCalculatedDecimal(value: number, maxDecimals = 3): string {
+function formatCalculatedDecimal(value: number, maxDecimals = 4): string {
     if (!Number.isFinite(value)) return ''
     return value.toFixed(maxDecimals).replace(/\.?0+$/, '')
 }
@@ -100,7 +100,7 @@ export function WorkOrderBatchForm() {
     const [availableLots, setAvailableLots] = useState<Lot[]>([])
     const [isLotSelectorOpen, setIsLotSelectorOpen] = useState(false)
     const lotSelectorRef = useRef<HTMLDivElement | null>(null)
-        const formTopRef = useRef<HTMLDivElement | null>(null)
+    const formTopRef = useRef<HTMLDivElement | null>(null)
 
     const [selectedLaborId, setSelectedLaborId] = useState<number | ''>('')
     const [contractor, setContractor] = useState('')
@@ -122,7 +122,7 @@ export function WorkOrderBatchForm() {
     const [isCreatingPendingSupply, setIsCreatingPendingSupply] = useState(false)
     const [pendingSupplyError, setPendingSupplyError] = useState<string | null>(null)
 
-        const [supplyRows, setSupplyRows] = useState<BatchSharedSupplyFormRow[]>(
+    const [supplyRows, setSupplyRows] = useState<BatchSharedSupplyFormRow[]>(
         buildInitialSupplyRows(),
     )
 
@@ -454,6 +454,17 @@ export function WorkOrderBatchForm() {
         return `${integerPart}.${decimalParts.join('')}`
     }
 
+    function normalizeDoseInput(value: string): string {
+        const normalized = value.replace(/[^0-9,.]/g, '').replace(/[,.]/g, ',')
+        const [integerPart = '', ...decimalParts] = normalized.split(',')
+
+        if (decimalParts.length === 0) {
+            return integerPart
+        }
+
+        return `${integerPart},${decimalParts.join('')}`
+    }
+
     function handleNumberBlur() {
         if (selectedProjectId === '') return
 
@@ -546,7 +557,7 @@ export function WorkOrderBatchForm() {
         setOpenSupplySelectorRowId(null)
     }
 
-        function handleRemoveSupplyRow(rowId: string) {
+    function handleRemoveSupplyRow(rowId: string) {
         setSupplyRows((current) =>
             current.length <= 3 ? current : current.filter((row) => row.rowId !== rowId),
         )
@@ -601,7 +612,7 @@ export function WorkOrderBatchForm() {
     }
 
     function updateSupplyRowFromFinalDose(rowId: string, value: string) {
-        const normalizedFinalDose = normalizeDecimalInput(value)
+        const normalizedFinalDose = normalizeDoseInput(value)
 
         updateSupplyRows((current) =>
             current.map((row) => {
@@ -613,7 +624,7 @@ export function WorkOrderBatchForm() {
                     const doseForCalc =
                         typeof preciseDose === 'number' && formatDose(preciseDose) === normalizedFinalDose
                             ? preciseDose
-                            : Number(normalizedFinalDose)
+                            : Number(normalizedFinalDose.replace(',', '.'))
 
                     return {
                         ...row,
@@ -782,7 +793,7 @@ export function WorkOrderBatchForm() {
 
         const errors = validateCreateBatchWorkOrderDraft(payload)
 
-                if (errors.length > 0) {
+        if (errors.length > 0) {
             setValidationErrors(errors)
             setSaveDraftError(null)
             setSaveDraftSuccessMessage(null)
@@ -810,7 +821,7 @@ export function WorkOrderBatchForm() {
                 `Se creo ${response.items.length} ordenes digitales.`,
             )
             resetFormAfterCreate()
-                } catch (error) {
+        } catch (error) {
             const message =
                 error instanceof Error ? error.message : 'Error guardando ordenes digitales'
             setSaveDraftError(message)
@@ -888,7 +899,7 @@ export function WorkOrderBatchForm() {
     }
 
     return (
-                <div className={styles.page}>
+        <div className={styles.page}>
             <div ref={formTopRef} />
             {toastMessage ? (
 
@@ -1311,8 +1322,8 @@ export function WorkOrderBatchForm() {
 
                             <div className={styles.insumoGridHead}>
                                 <span>Insumo</span>
-                                <span>Total utilizado</span>
                                 <span>Dosis final</span>
+                                <span>Total utilizado</span>
                                 <span className={styles.actionsCol}>Accion</span>
                             </div>
                             {supplyRows.map((row) => {
@@ -1365,11 +1376,10 @@ export function WorkOrderBatchForm() {
                                                         </span>
                                                     ) : (
                                                         <span className="wof-supplyTriggerPlaceholder">
-                                                            Seleccionar...
+                                                            Seleccionar insumo
                                                         </span>
                                                     )}
                                                 </button>
-
                                                 {openSupplySelectorRowId === row.rowId ? (
                                                     <div className="wof-supplySelectorPopover">
                                                         <input
@@ -1501,22 +1511,23 @@ export function WorkOrderBatchForm() {
                                             </div>
                                         </div>
 
-                                                                                <input
+                                        
+                                        <input
                                             type="text"
                                             inputMode="decimal"
-                                            placeholder="Lt/Kg/Bolsas"
-                                            value={row.total_used}
+                                            placeholder="Dosis"
+                                            value={row.final_dose}
                                             onChange={(event) => {
-                                                updateSupplyRowFromTotalUsed(row.rowId, event.target.value)
+                                                updateSupplyRowFromFinalDose(row.rowId, event.target.value)
                                             }}
                                         />
                                         <input
                                             type="text"
                                             inputMode="decimal"
-                                            placeholder="Total/superficie"
-                                            value={row.final_dose}
+                                            placeholder="Total usado"
+                                            value={row.total_used}
                                             onChange={(event) => {
-                                                updateSupplyRowFromFinalDose(row.rowId, event.target.value)
+                                                updateSupplyRowFromTotalUsed(row.rowId, event.target.value)
                                             }}
                                         />
                                         <button

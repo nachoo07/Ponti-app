@@ -96,26 +96,25 @@ rollback-staging / rollback-prod (manual) ▶ redeploy de un SHA aprobado
 - Las **25 variables** `_STG`/`_PROD` cargadas (corrí `configure-github.sh stg prod`). dev intacto.
 - Environments `staging`/`prod`: **NO creados** (la cuenta `gh devpablocristo` no tiene admin → HTTP 403). Se autocrean cuando corran los workflows; falta el gate de reviewers (lo pone un admin).
 
-## 6. Pendiente — PARA CONTINUAR ⏭️
+## 6. Provisión GCP — HECHA ✅ (2026-06-02, cuenta `softponti@gmail.com`)
 
-1. **Provisión GCP** (requiere admin en los proyectos GCP). Por cada ambiente:
-   ```bash
-   GITHUB_REPO="nachoo07/Ponti-app" \
-   X_API_KEY_VALUE="<valor>" \
-   IDENTITY_PLATFORM_API_KEY_VALUE="<web api key del proyecto>" \
-     ./scripts/gcp/provision-mobile-env.sh stg   # luego: prod
-   ```
-   Crea: Artifact Registry, Firebase site, secrets (`x-api-key-<env>`, `identity-platform-api-key-<env>`), IAM (secretAccessor al runtime SA; roles de deploy + actAs al deployer SA) y el **binding de WIF al repo de mobile**.
-   - ⚠️ Verificar el attribute mapping del WIF provider (`attribute.repository`).
-   - ⚠️ Verificar Identity Platform habilitado (Email/Password) en stg/prod y que la Web API Key cargada sea la correcta.
-   - ⚠️ Confirmar que `ponti-backend` esté desplegado en stg/prod (para resolver `BASE_MANAGER_API`).
+Ejecutada con comandos explícitos (verificada, sin impacto en backend/otros servicios). Por cada proyecto (`new-ponti-stg`, `new-ponti-prod`):
+- AR repo `cloud-run-source-deploy` creado.
+- Secret `identity-platform-api-key-<env>` creado + cargado con el Web API Key del proyecto (stg: `identity-platform-web-stg`; prod: `ponti-frontend-prod`).
+- Firebase site `ponti-mobile-<env>` creado (vía REST + token gcloud).
+- WIF: `nachoo07/Ponti-app` appendeado a la `attributeCondition` del provider (append-only, repos previos preservados) + bindings `workloadIdentityUser`/`serviceAccountTokenCreator` en `github-actions@<proj>`.
+- `x-api-key-<env>` **NO se tocó** (ya existía, lo reusa mobile). Runtime SA ya tenía `secretAccessor` a nivel proyecto; deployer SA ya tenía roles de deploy.
 
-2. **Environments + reviewers** (requiere admin del repo `nachoo07/Ponti-app`):
-   crear/configurar `staging` y `prod` en Settings → Environments con required reviewers
+`scripts/gcp/provision-mobile-env.sh` quedó actualizado para reflejar esto (idempotente y no destructivo) por si hay que re-correrlo o sumar otro ambiente.
+
+## 6b. Pendiente — PARA CONTINUAR ⏭️
+
+1. **Commitear + pushear la rama `ambientes`** (el código sigue sin commitear).
+2. **Mergear la rama `ambientes`** a `main`. ⚠️ Al mergear a `main`, `deploy-staging.yml` se dispara solo en push (primer deploy real de stg).
+3. **Environments + reviewers** (opcional; requiere admin del repo `nachoo07/Ponti-app`):
+   crear `staging`/`prod` en Settings → Environments con required reviewers
    (o re-correr `configure-github.sh` con admin y `STAGING_REVIEWERS=`/`PROD_REVIEWERS=`).
-
-3. **Mergear la rama `ambientes`** a `main` (DESPUÉS de la provisión GCP).
-   ⚠️ Al mergear a `main`, `deploy-staging.yml` se dispara solo en push.
+   Sin esto los deploys igual corren, pero sin gate de aprobación.
 
 ## 7. Criterios de aceptación / verificación
 

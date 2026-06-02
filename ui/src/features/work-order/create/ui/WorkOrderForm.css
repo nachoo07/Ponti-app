@@ -577,6 +577,62 @@
   cursor: pointer;
 }
 
+.wof-confirmation {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 14px;
+  padding: 48px 24px;
+}
+
+.wof-confirmationIcon {
+  display: grid;
+  place-items: center;
+  width: 96px;
+  height: 96px;
+  border-radius: var(--radius-full);
+  background: var(--color-success-light);
+  font-size: 52px;
+  line-height: 1;
+}
+
+.wof-confirmationTitle {
+  margin: 0;
+  font-size: 1.5rem;
+  color: var(--color-accent-dark);
+  outline: none;
+}
+
+.wof-confirmationSubtitle {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.98rem;
+}
+
+.wof-confirmationActions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 320px;
+  margin-top: 8px;
+}
+
+.wof-confirmationSecondary {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+  max-width: 320px;
+  margin-top: 8px;
+  padding-top: 20px;
+  border-top: 1px solid var(--color-border-light);
+}
+
+.wof-confirmationSecondary > * {
+  flex: 1;
+}
+
 @media (min-width: 640px) {
   .wof-grid3 {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -654,6 +710,19 @@
 
   .wof-footerActions > * {
     width: 100%;
+  }
+
+  .wof-confirmation {
+    padding: 36px 8px;
+  }
+
+  .wof-confirmationActions,
+  .wof-confirmationSecondary {
+    max-width: none;
+  }
+
+  .wof-confirmationSecondary {
+    flex-direction: column;
   }
 
   .wof-toast {

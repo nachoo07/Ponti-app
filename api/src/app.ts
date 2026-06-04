@@ -3,6 +3,7 @@ import express from 'express'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { logger } from './logger.js'
 import authRoutes from './routes/auth.js'
 import campaignsRoutes from './routes/campaigns.js'
 import customersRoutes from './routes/customers.js'
@@ -20,6 +21,28 @@ export function createApp() {
 
   app.use(cors())
   app.use(express.json())
+
+  app.use((req, res, next) => {
+    const startedAt = Date.now()
+
+    res.on('finish', () => {
+      // Solo logueamos llamadas a la API; evitamos los assets estáticos del SPA,
+      // el catch-all del index y el /health (lo pega el healthcheck de Cloud Run).
+      if (!req.path.startsWith('/api/v1')) {
+        return
+      }
+
+      logger.info('http_request', {
+        method: req.method,
+        // req.path no incluye query string (evita loguear params sensibles a futuro).
+        path: req.path,
+        status: res.statusCode,
+        durationMs: Date.now() - startedAt,
+      })
+    })
+
+    next()
+  })
 
   if (hasFrontendBundle) {
     app.use(express.static(frontendPath))

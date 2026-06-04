@@ -809,6 +809,15 @@ export function WorkOrderBatchForm() {
 
         try {
             const response = await createBatchWorkOrderDraft(payload)
+
+            if (!response.items || response.items.length === 0) {
+                // Respuesta exitosa pero sin órdenes: no reseteamos el form ni mostramos
+                // la confirmación (quedaría muda). Avisamos vía toast de error.
+                setSaveDraftError('No se creó ninguna orden. Revisá los datos e intentá de nuevo.')
+                scrollToFormTop()
+                return
+            }
+
             const createdByLotId = new Map(selectedLots.map((lot) => [lot.lot_id, lot.lot_name]))
 
             setCreatedDrafts(
@@ -932,11 +941,13 @@ export function WorkOrderBatchForm() {
 
             <div className={styles.card}>
                 {createdDrafts.length > 0 ? (
-                    <section
-                        className="wof-confirmation"
-                        role="status"
-                        aria-live="polite"
-                    >
+                    <section className="wof-confirmation">
+                        {/*
+                          El anuncio a lectores de pantalla lo da el foco en el <h2>
+                          (tabIndex={-1} + .focus()). No usamos role="status"/aria-live
+                          en el contenedor para evitar el doble anuncio (live-region +
+                          movimiento de foco sobre el mismo bloque recién insertado).
+                        */}
                         <div className="wof-confirmationIcon" aria-hidden="true">
                             ✅
                         </div>

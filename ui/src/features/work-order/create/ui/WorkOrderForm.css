@@ -541,12 +541,6 @@
   border: 1px solid transparent;
 }
 
-.wof-toast.is-success {
-  background: var(--color-success-light);
-  border-color: rgba(16, 185, 129, 0.16);
-  color: var(--color-accent-dark);
-}
-
 .wof-toast.is-error {
   background: var(--color-danger-light);
   border-color: rgba(220, 38, 38, 0.14);

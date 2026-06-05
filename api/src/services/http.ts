@@ -9,7 +9,8 @@ export const managerApi = axios.create({
 
 // Observabilidad de las llamadas al backend de Ponti (Manager API).
 // Cubre los try/catch de las rutas sin tocarlos uno por uno.
-// No se loguean headers (X-API-KEY / Authorization) ni el body del request.
+// No se loguean headers (X-API-KEY / Authorization), ni el body del request,
+// ni el body de la respuesta (puede contener PII de clientes/proyectos).
 managerApi.interceptors.request.use((requestConfig) => {
   ;(requestConfig as { metadata?: { startedAt: number } }).metadata = {
     startedAt: Date.now(),
@@ -45,7 +46,6 @@ managerApi.interceptors.response.use(
       status: error?.response?.status,
       code: error?.code,
       durationMs: durationMs(requestConfig),
-      responseData: error?.response?.data,
     })
     return Promise.reject(error)
   },

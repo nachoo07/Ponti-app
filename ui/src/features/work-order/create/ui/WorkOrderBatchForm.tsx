@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { getCategories } from '../../../../entities/category/api/getCategories'
 import { LABOR_TYPE_ID } from '../../../../entities/category/model/category.types'
 import type { Category } from '../../../../entities/category/model/category.types'
@@ -105,6 +106,8 @@ export function WorkOrderBatchForm() {
     const [isLotSelectorOpen, setIsLotSelectorOpen] = useState(false)
     const lotSelectorRef = useRef<HTMLDivElement | null>(null)
     const formTopRef = useRef<HTMLDivElement | null>(null)
+    const confirmationHeadingRef = useRef<HTMLHeadingElement | null>(null)
+    const navigate = useNavigate()
 
     const [selectedLaborId, setSelectedLaborId] = useState<number | ''>('')
     const [contractor, setContractor] = useState('')
@@ -147,14 +150,12 @@ export function WorkOrderBatchForm() {
     const [isSavingDraft, setIsSavingDraft] = useState(false)
     const [isDownloadingGroupPdf, setIsDownloadingGroupPdf] = useState(false)
     const [saveDraftError, setSaveDraftError] = useState<string | null>(null)
-    const [saveDraftSuccessMessage, setSaveDraftSuccessMessage] = useState<string | null>(null)
     const [groupPdfError, setGroupPdfError] = useState<string | null>(null)
     const [validationErrors, setValidationErrors] = useState<string[]>([])
     const [createdDrafts, setCreatedDrafts] = useState<CreatedBatchDraft[]>([])
     const [preciseDoseByRow, setPreciseDoseByRow] = useState<Record<string, number>>({})
 
-    const toastMessage = groupPdfError ?? saveDraftError ?? saveDraftSuccessMessage
-    const toastVariant = groupPdfError || saveDraftError ? 'error' : 'success'
+    const toastMessage = groupPdfError ?? saveDraftError
 
     const {
         customers,
@@ -213,7 +214,6 @@ export function WorkOrderBatchForm() {
         setNumberPreviewError(null)
         setValidationErrors([])
         setCreatedDrafts([])
-        setSaveDraftSuccessMessage(null)
         setSaveDraftError(null)
         setGroupPdfError(null)
     }
@@ -331,7 +331,6 @@ export function WorkOrderBatchForm() {
         if (!toastMessage) return
 
         const timeoutId = window.setTimeout(() => {
-            setSaveDraftSuccessMessage(null)
             setSaveDraftError(null)
             setGroupPdfError(null)
         }, 4500)
@@ -340,6 +339,12 @@ export function WorkOrderBatchForm() {
             window.clearTimeout(timeoutId)
         }
     }, [toastMessage])
+
+    useEffect(() => {
+        if (createdDrafts.length > 0) {
+            confirmationHeadingRef.current?.focus()
+        }
+    }, [createdDrafts.length])
 
     useEffect(() => {
         if (!selectedProjectDetail || selectedFieldId === '') return
@@ -512,7 +517,6 @@ export function WorkOrderBatchForm() {
 
     function handleToggleLot(lot: Lot, checked: boolean) {
         setCreatedDrafts([])
-        setSaveDraftSuccessMessage(null)
 
         if (checked) {
             setSelectedLots((current) => {
@@ -863,7 +867,6 @@ export function WorkOrderBatchForm() {
                 missingCommonFields.map((field) => `Falta completar: ${field}.`),
             )
             setSaveDraftError(null)
-            setSaveDraftSuccessMessage(null)
             scrollToFormTop()
             return
         }
@@ -878,7 +881,6 @@ export function WorkOrderBatchForm() {
         if (!selectedLabor) {
             setValidationErrors(['No se encontró la labor seleccionada.'])
             setSaveDraftError(null)
-            setSaveDraftSuccessMessage(null)
             scrollToFormTop()
             return
         }
@@ -910,7 +912,6 @@ export function WorkOrderBatchForm() {
         if (errors.length > 0) {
             setValidationErrors(errors)
             setSaveDraftError(null)
-            setSaveDraftSuccessMessage(null)
             scrollToFormTop()
             return
         }
@@ -918,11 +919,19 @@ export function WorkOrderBatchForm() {
         setIsSavingDraft(true)
         setValidationErrors([])
         setSaveDraftError(null)
-        setSaveDraftSuccessMessage(null)
         setGroupPdfError(null)
 
         try {
             const response = await createBatchWorkOrderDraft(payload)
+
+            if (!response.items || response.items.length === 0) {
+                // Respuesta exitosa pero sin órdenes: no reseteamos el form ni mostramos
+                // la confirmación (quedaría muda). Avisamos vía toast de error.
+                setSaveDraftError('No se creó ninguna orden. Revisá los datos e intentá de nuevo.')
+                scrollToFormTop()
+                return
+            }
+
             const createdByLotId = new Map(selectedLots.map((lot) => [lot.lot_id, lot.lot_name]))
 
             setCreatedDrafts(
@@ -930,9 +939,6 @@ export function WorkOrderBatchForm() {
                     ...item,
                     lot_name: item.lot_name ?? createdByLotId.get(item.lot_id) ?? `Lote #${item.lot_id}`,
                 })),
-            )
-            setSaveDraftSuccessMessage(
-                `Se creo ${response.items.length} ordenes digitales.`,
             )
             resetFormAfterCreate()
         } catch (error) {
@@ -944,6 +950,17 @@ export function WorkOrderBatchForm() {
             setIsSavingDraft(false)
         }
 
+    }
+
+    function handleCreateNewOrder() {
+        setCreatedDrafts([])
+        setGroupPdfError(null)
+        resetFormAfterCreate()
+        scrollToFormTop()
+    }
+
+    function handleGoHome() {
+        navigate('/home')
     }
 
     async function handleDownloadCreatedPdf() {
@@ -1017,16 +1034,15 @@ export function WorkOrderBatchForm() {
             <div ref={formTopRef} />
             {toastMessage ? (
 
-                <div className={`wof-toast is-${toastVariant}`} role="status" aria-live="polite">
+                <div className="wof-toast is-error" role="status" aria-live="polite">
                     <div className="wof-toastContent">
-                        <strong>{toastVariant === 'success' ? 'Listo' : 'Atención'}</strong>
+                        <strong>Atención</strong>
                         <span>{toastMessage}</span>
                     </div>
                     <button
                         type="button"
                         className="wof-toastClose"
                         onClick={() => {
-                            setSaveDraftSuccessMessage(null)
                             setSaveDraftError(null)
                             setGroupPdfError(null)
                         }}
@@ -1038,6 +1054,68 @@ export function WorkOrderBatchForm() {
             ) : null}
 
             <div className={styles.card}>
+                {createdDrafts.length > 0 ? (
+                    <section className="wof-confirmation">
+                        {/*
+                          El anuncio a lectores de pantalla lo da el foco en el <h2>
+                          (tabIndex={-1} + .focus()). No usamos role="status"/aria-live
+                          en el contenedor para evitar el doble anuncio (live-region +
+                          movimiento de foco sobre el mismo bloque recién insertado).
+                        */}
+                        <div className="wof-confirmationIcon" aria-hidden="true">
+                            ✅
+                        </div>
+                        <h2
+                            ref={confirmationHeadingRef}
+                            tabIndex={-1}
+                            className="wof-confirmationTitle"
+                        >
+                            {createdDrafts.length === 1
+                                ? 'Orden cargada correctamente'
+                                : 'Órdenes cargadas correctamente'}
+                        </h2>
+                        <p className="wof-confirmationSubtitle">
+                            {createdDrafts.length === 1
+                                ? '1 orden digital generada'
+                                : `${createdDrafts.length} órdenes digitales generadas`}
+                        </p>
+                        <div className="wof-confirmationActions">
+                            <button
+                                type="button"
+                                className={styles.primaryBtn}
+                                onClick={handleCreateNewOrder}
+                            >
+                                Crear nueva OT
+                            </button>
+                            <button
+                                type="button"
+                                className={styles.secondaryBtn}
+                                onClick={handleGoHome}
+                            >
+                                Volver al inicio
+                            </button>
+                        </div>
+                        <div className="wof-confirmationSecondary">
+                            <button
+                                type="button"
+                                className={styles.secondaryBtn}
+                                onClick={handleShareGroupPdf}
+                                disabled={isDownloadingGroupPdf}
+                            >
+                                {isDownloadingGroupPdf ? 'Preparando PDF...' : 'Compartir PDF'}
+                            </button>
+                            <button
+                                type="button"
+                                className={styles.secondaryBtn}
+                                onClick={handleDownloadCreatedPdf}
+                                disabled={isDownloadingGroupPdf}
+                            >
+                                {isDownloadingGroupPdf ? 'Descargando PDF...' : 'Descargar PDF'}
+                            </button>
+                        </div>
+                    </section>
+                ) : (
+                    <>
                 {validationErrors.length > 0 ? (
                     <section className="wof-errorCard">
                         <strong>Revisá estos datos antes de continuar:</strong>
@@ -1755,28 +1833,6 @@ export function WorkOrderBatchForm() {
                             />
                         </label>
                         <div className={styles.footerActions}>
-                            {createdDrafts.length > 0 ? (
-                                <>
-                                    <button
-                                        type="button"
-                                        className={styles.secondaryBtn}
-                                        onClick={handleShareGroupPdf}
-                                        disabled={isDownloadingGroupPdf}
-                                    >
-                                        {isDownloadingGroupPdf ? 'Preparando PDF...' : 'Compartir PDF'}
-                                    </button>
-
-                                    <button
-                                        type="button"
-                                        className={styles.secondaryBtn}
-                                        onClick={handleDownloadCreatedPdf}
-                                        disabled={isDownloadingGroupPdf}
-                                    >
-                                        {isDownloadingGroupPdf ? 'Descargando PDF...' : 'Descargar PDF'}
-                                    </button>
-                                </>
-                            ) : null}
-
                             <button
                                 type="button"
                                 className={styles.primaryBtn}
@@ -1788,6 +1844,8 @@ export function WorkOrderBatchForm() {
                         </div>
                     </fieldset>
                 </form>
+                    </>
+                )}
             </div>
         </div>
     )

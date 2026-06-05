@@ -490,6 +490,33 @@
   cursor: pointer;
 }
 
+/* Creador inline de labor: vive bajo el campo Labor (no dentro de un popover),
+   por eso ocupa toda la fila del summaryGrid y usa su propio botón sin los
+   bordes del popover de insumos. */
+.wof-laborCreate {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.wof-laborCreateAction {
+  justify-self: start;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+  color: var(--color-primary-dark);
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.wof-laborCreateAction:hover {
+  background: var(--color-surface-hover);
+}
+
 .wof-supplyOptionList {
   max-height: 240px;
   overflow-y: auto;

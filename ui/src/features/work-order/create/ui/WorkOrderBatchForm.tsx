@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { getCategories } from '../../../../entities/category/api/getCategories'
+import { LABOR_TYPE_ID } from '../../../../entities/category/model/category.types'
+import type { Category } from '../../../../entities/category/model/category.types'
+import { createLabor } from '../../../../entities/labor/api/createLabor'
 import type { Labor } from '../../../../entities/labor/model/labor.types'
 import type { InvestorSplit, Lot } from '../../../../entities/project/model/project.types'
 import { getProjectStock } from '../../../../entities/stock/api/getProjectStock'
@@ -85,6 +89,15 @@ function buildInitialSupplyRows(): BatchSharedSupplyFormRow[] {
     return [buildEmptySupplyRow(), buildEmptySupplyRow(), buildEmptySupplyRow()]
 }
 
+// Inserta un item en la lista deduplicando por id y manteniendo orden alfabético.
+function insertSortedById<T extends { id: number; name: string }>(list: T[], item: T): T[] {
+    if (list.some((existing) => existing.id === item.id)) {
+        return list
+    }
+
+    return [...list, item].sort((a, b) => a.name.localeCompare(b.name))
+}
+
 function buildSelectedLotFormRow(lot: Lot): BatchSelectedLotFormRow {
     return {
         rowId: crypto.randomUUID(),
@@ -107,6 +120,16 @@ export function WorkOrderBatchForm() {
 
     const [selectedLaborId, setSelectedLaborId] = useState<number | ''>('')
     const [contractor, setContractor] = useState('')
+    // rubros globales (type_id=4), se cachean entre proyectos a propósito
+    const [laborCategories, setLaborCategories] = useState<Category[]>([])
+    const [isLoadingLaborCategories, setIsLoadingLaborCategories] = useState(false)
+    const [laborCategoriesLoaded, setLaborCategoriesLoaded] = useState(false)
+    const [isCreatingLaborOpen, setIsCreatingLaborOpen] = useState(false)
+    const [newLaborName, setNewLaborName] = useState('')
+    const [newLaborCategoryId, setNewLaborCategoryId] = useState<number | ''>('')
+    const [newLaborContractor, setNewLaborContractor] = useState('')
+    const [isSavingLabor, setIsSavingLabor] = useState(false)
+    const [laborCreateError, setLaborCreateError] = useState<string | null>(null)
     const [selectedInvestorId, setSelectedInvestorId] = useState<number | ''>('')
     const [splitContribution, setSplitContribution] = useState(false)
     const [investorSplits, setInvestorSplits] = useState<InvestorSplit[]>([
@@ -165,6 +188,7 @@ export function WorkOrderBatchForm() {
         isLoadingProjectDetail,
         projectDetailError,
         labors,
+        setLabors,
         isLoadingLabors,
         laborsError,
         resetWorkspaceSelection,
@@ -173,6 +197,15 @@ export function WorkOrderBatchForm() {
         onProjectChange: resetProjectDependentSelections,
     })
 
+    // Limpia los campos del creador de labor (no toca laborCategories: es cache global).
+    function resetLaborCreatorFields() {
+        setIsCreatingLaborOpen(false)
+        setNewLaborName('')
+        setNewLaborCategoryId('')
+        setNewLaborContractor('')
+        setLaborCreateError(null)
+    }
+
     function resetProjectDependentSelections() {
         setSelectedFieldId('')
         setAvailableLots([])
@@ -180,6 +213,7 @@ export function WorkOrderBatchForm() {
         setSelectedLots([])
         setSelectedLaborId('')
         setContractor('')
+        resetLaborCreatorFields()
         setSelectedInvestorId('')
         setSplitContribution(false)
         setInvestorSplits([{ investor_id: '', percentage: '' }])
@@ -210,6 +244,7 @@ export function WorkOrderBatchForm() {
         setSelectedLots([])
         setSelectedLaborId('')
         setContractor('')
+        resetLaborCreatorFields()
         setSelectedInvestorId('')
         setSplitContribution(false)
         setInvestorSplits([{ investor_id: '', percentage: '' }])
@@ -686,15 +721,7 @@ export function WorkOrderBatchForm() {
                 type_name: '',
             }
 
-            setSupplies((current) => {
-                const alreadyExists = current.some((item) => item.id === nextSupply.id)
-
-                if (alreadyExists) {
-                    return current
-                }
-
-                return [...current, nextSupply].sort((a, b) => a.name.localeCompare(b.name))
-            })
+            setSupplies((current) => insertSortedById(current, nextSupply))
 
             updateSupplyRow(pendingSupplyRowId, {
                 supply_id: response.id,
@@ -710,6 +737,91 @@ export function WorkOrderBatchForm() {
             setIsCreatingPendingSupply(false)
         }
     }
+
+    async function handleOpenLaborCreator() {
+        setIsCreatingLaborOpen(true)
+        setNewLaborName('')
+        setNewLaborCategoryId('')
+        setNewLaborContractor('')
+        setLaborCreateError(null)
+
+        // Rubros globales: se cargan una sola vez y se cachean entre aperturas/proyectos.
+        if (laborCategoriesLoaded) return
+
+        setIsLoadingLaborCategories(true)
+        try {
+            const categories = await getCategories({ typeId: LABOR_TYPE_ID })
+            setLaborCategories(categories)
+            setLaborCategoriesLoaded(true)
+        } catch {
+            setLaborCreateError('No se pudieron cargar los rubros.')
+        } finally {
+            setIsLoadingLaborCategories(false)
+        }
+    }
+
+    function handleCloseLaborCreator() {
+        resetLaborCreatorFields()
+    }
+
+    async function handleCreateLabor() {
+        if (selectedProjectId === '') return
+
+        const normalizedName = newLaborName.trim()
+        const normalizedContractor = newLaborContractor.trim()
+
+        if (!normalizedName) {
+            setLaborCreateError('Ingresá un nombre para la labor.')
+            return
+        }
+        if (newLaborCategoryId === '') {
+            setLaborCreateError('Seleccioná un rubro.')
+            return
+        }
+        if (!normalizedContractor) {
+            setLaborCreateError('Ingresá el contratista.')
+            return
+        }
+
+        setIsSavingLabor(true)
+        setLaborCreateError(null)
+
+        try {
+            const created = await createLabor({
+                projectId: selectedProjectId,
+                name: normalizedName,
+                categoryId: newLaborCategoryId,
+                contractorName: normalizedContractor,
+            })
+
+            const category = laborCategories.find((item) => item.id === newLaborCategoryId)
+
+            const nextLabor: Labor = {
+                id: created.id,
+                name: created.name,
+                category_id: newLaborCategoryId,
+                price: '0',
+                is_partial_price: false,
+                contractor_name: normalizedContractor,
+                category_name: category?.name ?? '',
+                updated_at: '',
+            }
+
+            setLabors((current) => insertSortedById(current, nextLabor))
+
+            setSelectedLaborId(created.id)
+            setContractor(normalizedContractor)
+
+            handleCloseLaborCreator()
+        } catch (error) {
+            const message =
+                error instanceof Error ? error.message : 'No se pudo crear la labor.'
+            setLaborCreateError(message)
+        } finally {
+            setIsSavingLabor(false)
+        }
+    }
+
     function scrollToFormTop() {
         if (!formTopRef.current) return
 
@@ -1254,6 +1366,101 @@ export function WorkOrderBatchForm() {
                                 </select>
                                 {laborsError ? <small>{laborsError}</small> : null}
                             </label>
+
+                            {selectedProjectId !== '' && !isLoadingLabors && !laborsError ? (
+                                <div className="wof-laborCreate">
+                                    {!isCreatingLaborOpen ? (
+                                        <button
+                                            type="button"
+                                            className="wof-laborCreateAction"
+                                            onClick={handleOpenLaborCreator}
+                                        >
+                                            + Crear nueva labor
+                                        </button>
+                                    ) : (
+                                        <div className="wof-pendingSupplyCard">
+                                            <input
+                                                type="text"
+                                                aria-label="Nombre de la labor"
+                                                placeholder="Nombre de la labor"
+                                                value={newLaborName}
+                                                onChange={(event) => {
+                                                    setNewLaborName(event.target.value)
+                                                    setLaborCreateError(null)
+                                                }}
+                                                autoFocus
+                                            />
+
+                                            <select
+                                                aria-label="Rubro"
+                                                value={newLaborCategoryId}
+                                                disabled={isLoadingLaborCategories}
+                                                onChange={(event) => {
+                                                    const value = event.target.value
+                                                    setNewLaborCategoryId(value ? Number(value) : '')
+                                                    setLaborCreateError(null)
+                                                }}
+                                            >
+                                                <option value="" disabled>
+                                                    {isLoadingLaborCategories
+                                                        ? 'Cargando rubros...'
+                                                        : laborCategoriesLoaded && laborCategories.length === 0
+                                                          ? 'No hay rubros disponibles'
+                                                          : 'Seleccionar rubro...'}
+                                                </option>
+                                                {laborCategories.map((category) => (
+                                                    <option key={category.id} value={category.id}>
+                                                        {category.name}
+                                                    </option>
+                                                ))}
+                                            </select>
+
+                                            <input
+                                                type="text"
+                                                aria-label="Contratista"
+                                                placeholder="Contratista"
+                                                value={newLaborContractor}
+                                                onChange={(event) => {
+                                                    setNewLaborContractor(event.target.value)
+                                                    setLaborCreateError(null)
+                                                }}
+                                            />
+
+                                            <div className="wof-pendingSupplyActions">
+                                                <button
+                                                    type="button"
+                                                    className={styles.secondaryBtn}
+                                                    onClick={handleCreateLabor}
+                                                    disabled={
+                                                        isSavingLabor ||
+                                                        isLoadingLaborCategories ||
+                                                        !newLaborName.trim() ||
+                                                        newLaborCategoryId === '' ||
+                                                        !newLaborContractor.trim()
+                                                    }
+                                                >
+                                                    {isSavingLabor ? 'Creando...' : 'Guardar'}
+                                                </button>
+
+                                                <button
+                                                    type="button"
+                                                    className={styles.dangerBtn}
+                                                    onClick={handleCloseLaborCreator}
+                                                    disabled={isSavingLabor}
+                                                >
+                                                    Cancelar
+                                                </button>
+                                            </div>
+
+                                            {laborCreateError ? (
+                                                <small className="wof-inlineError">
+                                                    {laborCreateError}
+                                                </small>
+                                            ) : null}
+                                        </div>
+                                    )}
+                                </div>
+                            ) : null}
 
                             <label className={`${styles.field} wof-fixedField wof-summaryContractor`}>
                                 <span>Contratista</span>

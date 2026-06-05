@@ -18,3 +18,28 @@ export type LaborsResponse = {
     total: number
   }
 }
+
+export type CreateLaborPayload = {
+  projectId: number
+  name: string
+  categoryId: number
+  contractorName: string
+  price?: string
+  isPartialPrice?: boolean
+}
+
+export type CreateLaborResult = {
+  id: number
+  name: string
+}
+
+// El backend crea labores en batch y responde 207 con un item por labor.
+export type CreateLaborsResponse = {
+  message: string
+  labors_ids: {
+    labor_name: string
+    labor_id: number
+    is_saved: boolean
+    error_detail: string
+  }[]
+}

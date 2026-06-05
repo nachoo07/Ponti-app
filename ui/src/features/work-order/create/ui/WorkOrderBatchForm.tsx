@@ -89,6 +89,15 @@ function buildInitialSupplyRows(): BatchSharedSupplyFormRow[] {
     return [buildEmptySupplyRow(), buildEmptySupplyRow(), buildEmptySupplyRow()]
 }
 
+// Inserta un item en la lista deduplicando por id y manteniendo orden alfabético.
+function insertSortedById<T extends { id: number; name: string }>(list: T[], item: T): T[] {
+    if (list.some((existing) => existing.id === item.id)) {
+        return list
+    }
+
+    return [...list, item].sort((a, b) => a.name.localeCompare(b.name))
+}
+
 function buildSelectedLotFormRow(lot: Lot): BatchSelectedLotFormRow {
     return {
         rowId: crypto.randomUUID(),
@@ -111,13 +120,16 @@ export function WorkOrderBatchForm() {
 
     const [selectedLaborId, setSelectedLaborId] = useState<number | ''>('')
     const [contractor, setContractor] = useState('')
+    // rubros globales (type_id=4), se cachean entre proyectos a propósito
     const [laborCategories, setLaborCategories] = useState<Category[]>([])
+    const [isLoadingLaborCategories, setIsLoadingLaborCategories] = useState(false)
+    const [laborCategoriesLoaded, setLaborCategoriesLoaded] = useState(false)
     const [isCreatingLaborOpen, setIsCreatingLaborOpen] = useState(false)
-    const [pendingLaborName, setPendingLaborName] = useState('')
-    const [pendingLaborCategoryId, setPendingLaborCategoryId] = useState<number | ''>('')
-    const [pendingLaborContractor, setPendingLaborContractor] = useState('')
-    const [isCreatingPendingLabor, setIsCreatingPendingLabor] = useState(false)
-    const [pendingLaborError, setPendingLaborError] = useState<string | null>(null)
+    const [newLaborName, setNewLaborName] = useState('')
+    const [newLaborCategoryId, setNewLaborCategoryId] = useState<number | ''>('')
+    const [newLaborContractor, setNewLaborContractor] = useState('')
+    const [isSavingLabor, setIsSavingLabor] = useState(false)
+    const [laborCreateError, setLaborCreateError] = useState<string | null>(null)
     const [selectedInvestorId, setSelectedInvestorId] = useState<number | ''>('')
     const [splitContribution, setSplitContribution] = useState(false)
     const [investorSplits, setInvestorSplits] = useState<InvestorSplit[]>([
@@ -185,6 +197,15 @@ export function WorkOrderBatchForm() {
         onProjectChange: resetProjectDependentSelections,
     })
 
+    // Limpia los campos del creador de labor (no toca laborCategories: es cache global).
+    function resetLaborCreatorFields() {
+        setIsCreatingLaborOpen(false)
+        setNewLaborName('')
+        setNewLaborCategoryId('')
+        setNewLaborContractor('')
+        setLaborCreateError(null)
+    }
+
     function resetProjectDependentSelections() {
         setSelectedFieldId('')
         setAvailableLots([])
@@ -192,11 +213,7 @@ export function WorkOrderBatchForm() {
         setSelectedLots([])
         setSelectedLaborId('')
         setContractor('')
-        setIsCreatingLaborOpen(false)
-        setPendingLaborName('')
-        setPendingLaborCategoryId('')
-        setPendingLaborContractor('')
-        setPendingLaborError(null)
+        resetLaborCreatorFields()
         setSelectedInvestorId('')
         setSplitContribution(false)
         setInvestorSplits([{ investor_id: '', percentage: '' }])
@@ -227,11 +244,7 @@ export function WorkOrderBatchForm() {
         setSelectedLots([])
         setSelectedLaborId('')
         setContractor('')
-        setIsCreatingLaborOpen(false)
-        setPendingLaborName('')
-        setPendingLaborCategoryId('')
-        setPendingLaborContractor('')
-        setPendingLaborError(null)
+        resetLaborCreatorFields()
         setSelectedInvestorId('')
         setSplitContribution(false)
         setInvestorSplits([{ investor_id: '', percentage: '' }])
@@ -708,15 +721,7 @@ export function WorkOrderBatchForm() {
                 type_name: '',
             }
 
-            setSupplies((current) => {
-                const alreadyExists = current.some((item) => item.id === nextSupply.id)
-
-                if (alreadyExists) {
-                    return current
-                }
-
-                return [...current, nextSupply].sort((a, b) => a.name.localeCompare(b.name))
-            })
+            setSupplies((current) => insertSortedById(current, nextSupply))
 
             updateSupplyRow(pendingSupplyRowId, {
                 supply_id: response.id,
@@ -733,67 +738,68 @@ export function WorkOrderBatchForm() {
         }
     }
 
-    async function handleOpenPendingLaborCreator() {
+    async function handleOpenLaborCreator() {
         setIsCreatingLaborOpen(true)
-        setPendingLaborName('')
-        setPendingLaborCategoryId('')
-        setPendingLaborContractor('')
-        setPendingLaborError(null)
+        setNewLaborName('')
+        setNewLaborCategoryId('')
+        setNewLaborContractor('')
+        setLaborCreateError(null)
 
-        if (laborCategories.length === 0) {
-            try {
-                const categories = await getCategories({ typeId: LABOR_TYPE_ID })
-                setLaborCategories(categories)
-            } catch {
-                setPendingLaborError('No se pudieron cargar los rubros.')
-            }
+        // Rubros globales: se cargan una sola vez y se cachean entre aperturas/proyectos.
+        if (laborCategoriesLoaded) return
+
+        setIsLoadingLaborCategories(true)
+        try {
+            const categories = await getCategories({ typeId: LABOR_TYPE_ID })
+            setLaborCategories(categories)
+            setLaborCategoriesLoaded(true)
+        } catch {
+            setLaborCreateError('No se pudieron cargar los rubros.')
+        } finally {
+            setIsLoadingLaborCategories(false)
         }
     }
 
-    function handleClosePendingLaborCreator() {
-        setIsCreatingLaborOpen(false)
-        setPendingLaborName('')
-        setPendingLaborCategoryId('')
-        setPendingLaborContractor('')
-        setPendingLaborError(null)
+    function handleCloseLaborCreator() {
+        resetLaborCreatorFields()
     }
 
-    async function handleCreatePendingLabor() {
+    async function handleCreateLabor() {
         if (selectedProjectId === '') return
 
-        const normalizedName = pendingLaborName.trim()
-        const normalizedContractor = pendingLaborContractor.trim()
+        const normalizedName = newLaborName.trim()
+        const normalizedContractor = newLaborContractor.trim()
 
         if (!normalizedName) {
-            setPendingLaborError('Ingresá un nombre para la labor.')
+            setLaborCreateError('Ingresá un nombre para la labor.')
             return
         }
-        if (pendingLaborCategoryId === '') {
-            setPendingLaborError('Seleccioná un rubro.')
+        if (newLaborCategoryId === '') {
+            setLaborCreateError('Seleccioná un rubro.')
             return
         }
         if (!normalizedContractor) {
-            setPendingLaborError('Ingresá el contratista.')
+            setLaborCreateError('Ingresá el contratista.')
             return
         }
 
-        setIsCreatingPendingLabor(true)
-        setPendingLaborError(null)
+        setIsSavingLabor(true)
+        setLaborCreateError(null)
 
         try {
             const created = await createLabor({
                 projectId: selectedProjectId,
                 name: normalizedName,
-                categoryId: pendingLaborCategoryId,
+                categoryId: newLaborCategoryId,
                 contractorName: normalizedContractor,
             })
 
-            const category = laborCategories.find((item) => item.id === pendingLaborCategoryId)
+            const category = laborCategories.find((item) => item.id === newLaborCategoryId)
 
             const nextLabor: Labor = {
                 id: created.id,
                 name: created.name,
-                category_id: pendingLaborCategoryId,
+                category_id: newLaborCategoryId,
                 price: '0',
                 is_partial_price: false,
                 contractor_name: normalizedContractor,
@@ -801,26 +807,18 @@ export function WorkOrderBatchForm() {
                 updated_at: '',
             }
 
-            setLabors((current) => {
-                const alreadyExists = current.some((item) => item.id === nextLabor.id)
-
-                if (alreadyExists) {
-                    return current
-                }
-
-                return [...current, nextLabor].sort((a, b) => a.name.localeCompare(b.name))
-            })
+            setLabors((current) => insertSortedById(current, nextLabor))
 
             setSelectedLaborId(created.id)
             setContractor(normalizedContractor)
 
-            handleClosePendingLaborCreator()
+            handleCloseLaborCreator()
         } catch (error) {
             const message =
                 error instanceof Error ? error.message : 'No se pudo crear la labor.'
-            setPendingLaborError(message)
+            setLaborCreateError(message)
         } finally {
-            setIsCreatingPendingLabor(false)
+            setIsSavingLabor(false)
         }
     }
 
@@ -1374,8 +1372,8 @@ export function WorkOrderBatchForm() {
                                     {!isCreatingLaborOpen ? (
                                         <button
                                             type="button"
-                                            className="wof-supplyCreateAction"
-                                            onClick={handleOpenPendingLaborCreator}
+                                            className="wof-laborCreateAction"
+                                            onClick={handleOpenLaborCreator}
                                         >
                                             + Crear nueva labor
                                         </button>
@@ -1383,25 +1381,32 @@ export function WorkOrderBatchForm() {
                                         <div className="wof-pendingSupplyCard">
                                             <input
                                                 type="text"
+                                                aria-label="Nombre de la labor"
                                                 placeholder="Nombre de la labor"
-                                                value={pendingLaborName}
+                                                value={newLaborName}
                                                 onChange={(event) => {
-                                                    setPendingLaborName(event.target.value)
-                                                    setPendingLaborError(null)
+                                                    setNewLaborName(event.target.value)
+                                                    setLaborCreateError(null)
                                                 }}
                                                 autoFocus
                                             />
 
                                             <select
-                                                value={pendingLaborCategoryId}
+                                                aria-label="Rubro"
+                                                value={newLaborCategoryId}
+                                                disabled={isLoadingLaborCategories}
                                                 onChange={(event) => {
                                                     const value = event.target.value
-                                                    setPendingLaborCategoryId(value ? Number(value) : '')
-                                                    setPendingLaborError(null)
+                                                    setNewLaborCategoryId(value ? Number(value) : '')
+                                                    setLaborCreateError(null)
                                                 }}
                                             >
                                                 <option value="" disabled>
-                                                    Seleccionar rubro...
+                                                    {isLoadingLaborCategories
+                                                        ? 'Cargando rubros...'
+                                                        : laborCategoriesLoaded && laborCategories.length === 0
+                                                          ? 'No hay rubros disponibles'
+                                                          : 'Seleccionar rubro...'}
                                                 </option>
                                                 {laborCategories.map((category) => (
                                                     <option key={category.id} value={category.id}>
@@ -1412,11 +1417,12 @@ export function WorkOrderBatchForm() {
 
                                             <input
                                                 type="text"
+                                                aria-label="Contratista"
                                                 placeholder="Contratista"
-                                                value={pendingLaborContractor}
+                                                value={newLaborContractor}
                                                 onChange={(event) => {
-                                                    setPendingLaborContractor(event.target.value)
-                                                    setPendingLaborError(null)
+                                                    setNewLaborContractor(event.target.value)
+                                                    setLaborCreateError(null)
                                                 }}
                                             />
 
@@ -1424,25 +1430,31 @@ export function WorkOrderBatchForm() {
                                                 <button
                                                     type="button"
                                                     className={styles.secondaryBtn}
-                                                    onClick={handleCreatePendingLabor}
-                                                    disabled={isCreatingPendingLabor}
+                                                    onClick={handleCreateLabor}
+                                                    disabled={
+                                                        isSavingLabor ||
+                                                        isLoadingLaborCategories ||
+                                                        !newLaborName.trim() ||
+                                                        newLaborCategoryId === '' ||
+                                                        !newLaborContractor.trim()
+                                                    }
                                                 >
-                                                    {isCreatingPendingLabor ? 'Creando...' : 'Guardar'}
+                                                    {isSavingLabor ? 'Creando...' : 'Guardar'}
                                                 </button>
 
                                                 <button
                                                     type="button"
                                                     className={styles.dangerBtn}
-                                                    onClick={handleClosePendingLaborCreator}
-                                                    disabled={isCreatingPendingLabor}
+                                                    onClick={handleCloseLaborCreator}
+                                                    disabled={isSavingLabor}
                                                 >
                                                     Cancelar
                                                 </button>
                                             </div>
 
-                                            {pendingLaborError ? (
+                                            {laborCreateError ? (
                                                 <small className="wof-inlineError">
-                                                    {pendingLaborError}
+                                                    {laborCreateError}
                                                 </small>
                                             ) : null}
                                         </div>

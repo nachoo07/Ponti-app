@@ -27,13 +27,15 @@ router.get('', async (req, res) => {
   }
 
   const page = Number(req.query.page ?? 1)
-  const perPage = Number(req.query.per_page ?? 1000)
+  const perPage = Math.min(Number(req.query.per_page ?? 1000), 1000)
+  const typeId = typeof req.query.type_id === 'string' ? Number(req.query.type_id) : undefined
 
   try {
     const response = await managerApi.get('/categories', {
       params: {
         page,
         per_page: perPage,
+        ...(typeId ? { type_id: typeId } : {}),
       },
       headers,
     })

@@ -38,10 +38,12 @@ export async function createLabor(payload: CreateLaborPayload): Promise<CreateLa
 
   if (!first || !first.is_saved) {
     const detail = first?.error_detail ?? ''
-    const message = /already exists/i.test(detail)
+    const isConflict = /already exists/i.test(detail)
+    const message = isConflict
       ? 'Ya existe una labor con ese nombre en el proyecto.'
       : detail || 'No se pudo crear la labor.'
-    throw new ApiError(message, 409)
+    // 409 solo si es un conflicto real; el resto (validación, FK, etc.) es 422.
+    throw new ApiError(message, isConflict ? 409 : 422)
   }
 
   return { id: first.labor_id, name: first.labor_name }

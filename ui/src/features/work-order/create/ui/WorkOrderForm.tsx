@@ -1,14 +1,15 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import type { InvestorSplit, Lot } from '../../../../entities/project/model/project.types'
 import { useWorkOrderWorkspace } from '../model/useWorkOrderWorkspace'
 import { getSuppliesByProject } from '../../../../entities/supply/api/getSuppliesByProject'
+import { createPendingSupply } from '../../../../entities/supply/api/createPendingSupply'
 import { buildCreateWorkOrderDraftPayload } from '../model/buildCreateWorkOrderDraftPayload'
 import { validateCreateWorkOrderDraft } from '../model/validateCreateWorkOrderDraft'
 import { createWorkOrderDraft } from '../../../../entities/workOrderDraft/api/createWorkOrderDraft'
 import { downloadWorkOrderDraftPdf } from '../../../../entities/workOrderDraft/api/downloadWorkOrderDraftPdf'
 import { previewDigitalWorkOrderNumber } from '../../../../entities/workOrderDraft/api/previewDigitalWorkOrderNumber'
-import type { Supply, SupplyRow } from '../../../../entities/supply/model/supply.types'
+import type { Supply } from '../../../../entities/supply/model/supply.types'
 import type { WorkOrderDraftFormValues } from '../model/mapDraftToFormValues'
 import { updateWorkOrderDraft } from '../../../../entities/workOrderDraft/api/updateWorkOrderDraft'
 import type {
@@ -16,6 +17,17 @@ import type {
   UpdateWorkOrderDraftGroupPayload,
 } from '../../../../entities/workOrderDraft/model/workOrderDraft.types'
 import { buildUpdateWorkOrderDraftGroupPayload } from '../model/buildUpdateWorkOrderDraftGroupPayload'
+import type { BatchSharedSupplyFormRow } from '../model/workOrderBatchForm.types'
+import {
+  getTodayDateInputValue,
+  parseDecimal,
+  formatCalculatedDecimal,
+  formatDoseDecimal,
+  normalizeDecimalInput,
+  normalizeDoseInput,
+  buildEmptySupplyRow,
+} from '../model/workOrderBatchForm.helpers'
+import { SupplyRowsTable } from './SupplyRowsTable'
 import './WorkOrderForm.css'
 
 const styles = {
@@ -42,12 +54,6 @@ const styles = {
   footerActions: 'wof-footerActions',
   primaryBtn: 'wof-primaryBtn',
 } as const
-
-function getTodayDateInputValue(): string {
-  const today = new Date()
-  today.setMinutes(today.getMinutes() - today.getTimezoneOffset())
-  return today.toISOString().slice(0, 10)
-}
 
 type WorkOrderFormProps = {
   initialValues?: WorkOrderDraftFormValues
@@ -100,16 +106,17 @@ export function WorkOrderForm({
   const [supplies, setSupplies] = useState<Supply[]>([])
   const [isLoadingSupplies, setIsLoadingSupplies] = useState(false)
   const [suppliesError, setSuppliesError] = useState<string | null>(null)
-  const buildEmptySupplyRow = (): SupplyRow => ({
-    rowId: crypto.randomUUID(),
-    supply_id: '',
-    total_used: '',
-    final_dose: '',
-  })
 
-  const [supplyRows, setSupplyRows] = useState<SupplyRow[]>(
+  const [supplyRows, setSupplyRows] = useState<BatchSharedSupplyFormRow[]>(
     initialValues?.supplyRows ?? [buildEmptySupplyRow()],
   )
+
+  const [openSupplySelectorRowId, setOpenSupplySelectorRowId] = useState<string | null>(null)
+  const [supplySearchByRow, setSupplySearchByRow] = useState<Record<string, string>>({})
+  const [pendingSupplyRowId, setPendingSupplyRowId] = useState<string | null>(null)
+  const [pendingSupplyName, setPendingSupplyName] = useState('')
+  const [pendingSupplyError, setPendingSupplyError] = useState<string | null>(null)
+  const [isCreatingPendingSupply, setIsCreatingPendingSupply] = useState(false)
   const shouldRecalculateDoseOnAreaChange = useRef(!initialValues)
 
   const [effectiveArea, setEffectiveArea] = useState(initialValues?.effectiveArea ?? '')
@@ -151,7 +158,6 @@ export function WorkOrderForm({
     setWorkOrderNumber('')
     setNumberPreviewError(null)
   }
-
 
   const resetFormAfterCreate = () => {
     setSelectedFieldId('')
@@ -318,45 +324,7 @@ export function WorkOrderForm({
     setSelectedLot(nextSelectedLot)
   }, [selectedProjectDetail, selectedFieldId, selectedLotId])
 
-
-
   const projectInvestors = selectedProjectDetail?.investors ?? []
-
-  function parseDecimal(value: string): number {
-    const normalized = Number(value.replace(',', '.'))
-    return Number.isFinite(normalized) ? normalized : 0
-  }
-
-  function formatCalculatedDecimal(value: number): string {
-    if (!Number.isFinite(value)) return ''
-    return value.toFixed(4).replace(/\.?0+$/, '')
-  }
-
-  function formatDoseDecimal(value: number): string {
-    return formatCalculatedDecimal(value).replace('.', ',')
-  }
-
-  function normalizeDecimalInput(value: string): string {
-    const normalized = value.replace(',', '.').replace(/[^0-9.]/g, '')
-    const [integerPart = '', ...decimalParts] = normalized.split('.')
-
-    if (decimalParts.length === 0) {
-      return integerPart
-    }
-
-    return `${integerPart}.${decimalParts.join('')}`
-  }
-
-  function normalizeDoseInput(value: string): string {
-    const normalized = value.replace(/[^0-9,.]/g, '').replace(/[,.]/g, ',')
-    const [integerPart = '', ...decimalParts] = normalized.split(',')
-
-    if (decimalParts.length === 0) {
-      return integerPart
-    }
-
-    return `${integerPart},${decimalParts.join('')}`
-  }
 
   function getSupplyLabel(row: SupplyRow): string {
     const matchedSupply =
@@ -390,6 +358,136 @@ export function WorkOrderForm({
     })()
   }
 
+  const availableSupplies = useMemo(() => supplies, [supplies])
+
+  function updateSupplyRow(rowId: string, updates: Partial<BatchSharedSupplyFormRow>) {
+    setSupplyRows((current) =>
+      current.map((row) => (row.rowId === rowId ? { ...row, ...updates } : row)),
+    )
+  }
+
+  function handleOpenSupplySelector(rowId: string) {
+    setOpenSupplySelectorRowId(rowId)
+    setPendingSupplyRowId(null)
+    setPendingSupplyError(null)
+  }
+
+  function handleCloseSupplySelector() {
+    setOpenSupplySelectorRowId(null)
+    setPendingSupplyRowId(null)
+    setPendingSupplyName('')
+    setPendingSupplyError(null)
+  }
+
+  function handleSelectSupply(rowId: string, supply: Supply) {
+    updateSupplyRow(rowId, { supply_id: supply.id, supply_name: supply.name })
+    setOpenSupplySelectorRowId(null)
+  }
+
+  function handleOpenPendingSupplyCreator(rowId: string) {
+    setPendingSupplyRowId(rowId)
+    setPendingSupplyName('')
+    setPendingSupplyError(null)
+  }
+
+  function handleClosePendingSupplyCreator() {
+    setPendingSupplyRowId(null)
+    setPendingSupplyName('')
+    setPendingSupplyError(null)
+  }
+
+  async function handleCreatePendingSupply() {
+    if (selectedProjectId === '' || pendingSupplyRowId === null) return
+
+    const normalizedName = pendingSupplyName.trim()
+    if (!normalizedName) {
+      setPendingSupplyError('Ingresá un nombre para el insumo.')
+      return
+    }
+
+    setIsCreatingPendingSupply(true)
+    setPendingSupplyError(null)
+
+    try {
+      const response = await createPendingSupply({
+        project_id: selectedProjectId as number,
+        name: normalizedName,
+      })
+
+      const nextSupply: Supply = {
+        id: response.id,
+        name: response.name,
+        is_pending: response.is_pending,
+        price: '0',
+        category_name: '',
+        type_name: '',
+      }
+
+      setSupplies((current) => {
+        if (current.some((item) => item.id === nextSupply.id)) return current
+        return [...current, nextSupply].sort((a, b) => a.name.localeCompare(b.name))
+      })
+
+      updateSupplyRow(pendingSupplyRowId, {
+        supply_id: response.id,
+        supply_name: response.name,
+      })
+
+      handleCloseSupplySelector()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'No se pudo crear el insumo pendiente.'
+      setPendingSupplyError(message)
+    } finally {
+      setIsCreatingPendingSupply(false)
+    }
+  }
+
+  function updateSupplyRowFromTotalUsed(rowId: string, value: string) {
+    const normalized = normalizeDecimalInput(value)
+    const area = parseDecimal(effectiveArea)
+    setSupplyRows((current) =>
+      current.map((row) => {
+        if (row.rowId !== rowId) return row
+        const dose = area > 0 && normalized !== ''
+          ? formatDoseDecimal(parseDecimal(normalized) / area).replace('.', ',')
+          : ''
+        return { ...row, total_used: normalized, final_dose: dose, last_edited_field: 'total_used' as const }
+      }),
+    )
+  }
+
+  function updateSupplyRowFromFinalDose(rowId: string, value: string) {
+    const normalized = normalizeDoseInput(value)
+    const area = parseDecimal(effectiveArea)
+    setSupplyRows((current) =>
+      current.map((row) => {
+        if (row.rowId !== rowId) return row
+        const doseNum = parseDecimal(normalized.replace(',', '.'))
+        const total = area > 0 && normalized !== ''
+          ? formatCalculatedDecimal(doseNum * area)
+          : ''
+        return { ...row, final_dose: normalized, total_used: total, last_edited_field: 'final_dose' as const }
+      }),
+    )
+  }
+
+  function handleRemoveSupplyRow(rowId: string) {
+    setSupplyRows((current) => {
+      const next = current.filter((row) => row.rowId !== rowId)
+      return next.length === 0 ? [buildEmptySupplyRow()] : next
+    })
+    setSupplySearchByRow((current) => {
+      const next = { ...current }
+      delete next[rowId]
+      return next
+    })
+    if (openSupplySelectorRowId === rowId) handleCloseSupplySelector()
+  }
+
+  function handleAddSupplyRow() {
+    setSupplyRows((current) => [...current, buildEmptySupplyRow()])
+  }
+
   async function handleSaveDraft() {
     const missingBaseFields =
       selectedCustomerId === '' ||
@@ -421,39 +519,39 @@ export function WorkOrderForm({
 
     const payload: CreateWorkOrderDraftPayload | UpdateWorkOrderDraftGroupPayload = isGroupedDraft
       ? buildUpdateWorkOrderDraftGroupPayload({
-          number: workOrderNumber,
-          date: workOrderDate,
-          customerId,
-          projectId,
-          campaignId: selectedCampaignId === '' ? null : selectedCampaignId,
-          fieldId,
-          cropId: initialValues?.selectedCropId || selectedLot?.current_crop_id || 0,
-          selectedLabor,
-          contractor,
-          observations,
-          selectedInvestorId: selectedInvestorId === '' ? 0 : selectedInvestorId,
-          splitContribution,
-          investorSplits,
-          supplyRows,
-        })
+        number: workOrderNumber,
+        date: workOrderDate,
+        customerId,
+        projectId,
+        campaignId: selectedCampaignId === '' ? null : selectedCampaignId,
+        fieldId,
+        cropId: initialValues?.selectedCropId || selectedLot?.current_crop_id || 0,
+        selectedLabor,
+        contractor,
+        observations,
+        selectedInvestorId: selectedInvestorId === '' ? 0 : selectedInvestorId,
+        splitContribution,
+        investorSplits,
+        supplyRows,
+      })
       : buildCreateWorkOrderDraftPayload({
-          number: workOrderNumber,
-          date: workOrderDate,
-          customerId,
-          projectId,
-          campaignId: selectedCampaignId === '' ? null : selectedCampaignId,
-          fieldId,
-          lotId,
-          selectedLot: selectedLot!,
-          selectedLabor,
-          contractor,
-          effectiveArea,
-          observations,
-          selectedInvestorId: selectedInvestorId === '' ? 0 : selectedInvestorId,
-          splitContribution,
-          investorSplits,
-          supplyRows,
-        })
+        number: workOrderNumber,
+        date: workOrderDate,
+        customerId,
+        projectId,
+        campaignId: selectedCampaignId === '' ? null : selectedCampaignId,
+        fieldId,
+        lotId,
+        selectedLot: selectedLot!,
+        selectedLabor,
+        contractor,
+        effectiveArea,
+        observations,
+        selectedInvestorId: selectedInvestorId === '' ? 0 : selectedInvestorId,
+        splitContribution,
+        investorSplits,
+        supplyRows,
+      })
 
     if (!isGroupedDraft) {
       const errors = validateCreateWorkOrderDraft(payload as CreateWorkOrderDraftPayload)
@@ -741,12 +839,12 @@ export function WorkOrderForm({
               <label className={styles.field}>
                 <span>Lote</span>
                 {(isGroupedDraft || isReadOnly) && initialValues?.lotDisplayName ? (
-  <input
-    type="text"
-    value={initialValues.lotDisplayName}
-    placeholder="Se completa automaticamente"
-    readOnly
-  />
+                  <input
+                    type="text"
+                    value={initialValues.lotDisplayName}
+                    placeholder="Se completa automaticamente"
+                    readOnly
+                  />
                 ) : (
                   <select
                     value={selectedLotId}
@@ -965,164 +1063,32 @@ export function WorkOrderForm({
               )}
             </section>
 
-            <section className={styles.inputsSection}>
-              <div className={styles.sectionHeader}>
-                <h2 className={styles.subtitle}>Carga de insumos</h2>
-                {!isReadOnly ? (
-                  <button type="button" className={styles.secondaryBtn}>
-                    + Crear Nuevo Insumo
-                  </button>
-                ) : null}
-                {suppliesError ? <small>{suppliesError}</small> : null}
-              </div>
-
-              <div className={styles.insumoGridHead}>
-                <span>Insumo</span>
-                <span>Total utilizado</span>
-                <span>Dosis final</span>
-                <span className={styles.actionsCol}>Accion</span>
-              </div>
-
-              {supplyRows.map((row) => (
-                <div key={row.rowId} className={styles.insumoRow}>
-                  {isReadOnly ? (
-                    <input type="text" value={getSupplyLabel(row)} readOnly />
-                  ) : (
-                    <select
-                      value={row.supply_id}
-                      onChange={(event) => {
-                        const value = event.target.value
-                        const nextSupplyId = value ? Number(value) : ''
-
-                        setSupplyRows((current) =>
-                          current.map((item) =>
-                            item.rowId === row.rowId
-                              ? {
-                                  ...item,
-                                  supply_id: nextSupplyId,
-                                  supply_name:
-                                    supplies.find((supply) => supply.id === nextSupplyId)?.name ?? '',
-                                }
-                              : item,
-                          ),
-                        )
-                      }}
-                      disabled={selectedProjectId === '' || isLoadingSupplies || !!suppliesError}
-                    >
-                      <option value="" disabled>
-                        Seleccionar...
-                      </option>
-
-                      {row.supply_id !== '' &&
-                      !supplies.some((supply) => supply.id === row.supply_id) ? (
-                        <option value={row.supply_id}>
-                          {getSupplyLabel(row) || `Insumo #${row.supply_id}`}
-                        </option>
-                      ) : null}
-
-                      {supplies.map((supply) => {
-	                        const isUsedInAnotherRow = supplyRows.some(
-	                          (item) => item.rowId !== row.rowId && item.supply_id === supply.id,
-                        )
-
-                        return (
-                          <option key={supply.id} value={supply.id} disabled={isUsedInAnotherRow}>
-                            {supply.name}
-                          </option>
-                        )
-                      })}
-                    </select>
-                  )}
-                  <input
-                    type="number"
-                    placeholder="Lt/Kg/Bolsas"
-                    min="0"
-                    step="0.01"
-                    inputMode="decimal"
-                    value={row.total_used}
-                    onChange={(event) => {
-                      const value = event.target.value
-                      const surface = parseDecimal(effectiveArea)
-                      const totalUsed = parseDecimal(value)
-                      const nextDose =
-                        surface > 0 && value !== ''
-                          ? formatDoseDecimal(totalUsed / surface)
-                          : ''
-
-                      setSupplyRows((current) =>
-                        current.map((item) =>
-                          item.rowId === row.rowId
-                            ? {
-                              ...item,
-                              total_used: value,
-                              final_dose: nextDose,
-                            }
-                            : item,
-                        ),
-                      )
-                    }}
-                  />
-
-                  <input
-                    type="text"
-                    placeholder="Total/superficie"
-                    inputMode="decimal"
-                    value={row.final_dose}
-                    onChange={(event) => {
-                      const value = normalizeDoseInput(event.target.value)
-                      const surface = parseDecimal(effectiveArea)
-                      const dose = parseDecimal(value)
-                      const nextTotalUsed =
-                        surface > 0 && value !== ''
-                          ? formatCalculatedDecimal(dose * surface)
-                          : ''
-
-                      setSupplyRows((current) =>
-                        current.map((item) =>
-                          item.rowId === row.rowId
-                            ? {
-                              ...item,
-                              final_dose: value,
-                              total_used: nextTotalUsed,
-                            }
-                            : item,
-                        ),
-                      )
-                    }}
-                  />
-
-                  {!isReadOnly ? (
-                    <button
-                      type="button"
-                      className={styles.dangerBtn}
-                      onClick={() => {
-                        setSupplyRows((current) =>
-                          current.length === 1
-                            ? current
-                            : current.filter((item) => item.rowId !== row.rowId),
-                        )
-                      }}
-                    >
-                      Eliminar
-                    </button>
-                  ) : null}
-                </div>
-              ))}
-
-
-              {!isReadOnly ? (
-                <button
-                  type="button"
-                  className={styles.secondaryBtn}
-                  onClick={() => {
-                    setSupplyRows((current) => [...current, buildEmptySupplyRow()])
-                  }}
-                >
-                  + Agregar fila de insumo
-                </button>
-              ) : null}
-
-            </section>
+            <SupplyRowsTable
+              supplyRows={supplyRows}
+              suppliesError={suppliesError}
+              selectedProjectId={selectedProjectId}
+              isLoadingSupplies={isLoadingSupplies}
+              availableSupplies={availableSupplies}
+              supplySearchByRow={supplySearchByRow}
+              setSupplySearchByRow={setSupplySearchByRow}
+              openSupplySelectorRowId={openSupplySelectorRowId}
+              onOpenSelector={handleOpenSupplySelector}
+              onCloseSelector={handleCloseSupplySelector}
+              setPendingSupplyName={setPendingSupplyName}
+              setPendingSupplyError={setPendingSupplyError}
+              onSelectSupply={handleSelectSupply}
+              pendingSupplyRowId={pendingSupplyRowId}
+              pendingSupplyName={pendingSupplyName}
+              isCreatingPendingSupply={isCreatingPendingSupply}
+              onOpenPendingCreator={handleOpenPendingSupplyCreator}
+              onClosePendingCreator={handleClosePendingSupplyCreator}
+              onCreatePendingSupply={handleCreatePendingSupply}
+              pendingSupplyError={pendingSupplyError}
+              updateSupplyRowFromFinalDose={updateSupplyRowFromFinalDose}
+              updateSupplyRowFromTotalUsed={updateSupplyRowFromTotalUsed}
+              onRemoveSupplyRow={handleRemoveSupplyRow}
+              onAddSupplyRow={handleAddSupplyRow}
+            />
 
             <label className={styles.field}>
               <span>Observaciones</span>
@@ -1190,5 +1156,4 @@ export function WorkOrderForm({
       </div>
     </div>
   )
-
 }

@@ -22,11 +22,14 @@ export type WorkOrderDraftDetail = {
   field_id: number
   lot_id: number
   crop_id: number
+  crop_name?: string
   labor_id: number
+  labor_name?: string
   contractor: string
   effective_area: string
   observations: string
   investor_id: number
+  investor_name?: string
   status: string
   is_digital?: boolean
   review_notes: string
@@ -43,8 +46,10 @@ export type WorkOrderDraftListItem = {
   id: number
   number: string
   date: string
+  customer_name?: string
   project_id: number
   project_name: string
+  campaign_name?: string | null
   field_id: number
   field_name: string
   status: string

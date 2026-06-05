@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
+import { FilePlus2, Search } from 'lucide-react'
 import {
   getWorkOrderDrafts,
   type GetWorkOrderDraftsResult,
@@ -90,17 +92,6 @@ function FilterIcon({
   )
 }
 
-function ActionIcon() {
-  return (
-    <svg viewBox="0 0 16 16" aria-hidden="true" className="work-order-drafts-rowIcon">
-      <path
-        d="M2 8s2.4-4 6-4 6 4 6 4-2.4 4-6 4-6-4-6-4zm6 2.2A2.2 2.2 0 108 5.8a2.2 2.2 0 000 4.4z"
-        fill="currentColor"
-      />
-    </svg>
-  )
-}
-
 function normalizeDate(value: string): string {
   const trimmed = value.trim()
 
@@ -126,10 +117,14 @@ function getColumnDisplayValue(draft: WorkOrderDraftListItem, key: ColumnKey): s
 
 export function WorkOrderDraftsPage() {
   const [searchNumber, setSearchNumber] = useState('')
+  const [customerFilter, setCustomerFilter] = useState('')
+  const [projectFilter, setProjectFilter] = useState('')
+  const [campaignFilter, setCampaignFilter] = useState('')
+  const [fieldFilter, setFieldFilter] = useState('')
   const [drafts, setDrafts] = useState<WorkOrderDraftListItem[]>([])
   const [pageInfo, setPageInfo] = useState<WorkOrderDraftListPageInfo>(defaultPageInfo)
   const [page, setPage] = useState(1)
-  const [perPage, setPerPage] = useState(10)
+  const perPage = 10
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -148,10 +143,12 @@ export function WorkOrderDraftsPage() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
 
   const filterPopoverRef = useRef<HTMLDivElement | null>(null)
+  const filterButtonRefs = useRef<Partial<Record<ColumnKey, HTMLButtonElement | null>>>({})
+  const [filterPopoverPosition, setFilterPopoverPosition] = useState<{ top: number; left: number } | null>(null)
 
   useEffect(() => {
     setPage(1)
-  }, [searchNumber])
+  }, [campaignFilter, customerFilter, fieldFilter, projectFilter, searchNumber])
 
   useEffect(() => {
     let cancelled = false
@@ -206,6 +203,7 @@ export function WorkOrderDraftsPage() {
 
       if (!filterPopoverRef.current.contains(event.target as Node)) {
         setOpenColumnFilter(null)
+        setFilterPopoverPosition(null)
       }
     }
 
@@ -216,8 +214,63 @@ export function WorkOrderDraftsPage() {
     }
   }, [openColumnFilter])
 
+  useEffect(() => {
+    if (!openColumnFilter) return
+
+    function updatePosition() {
+      const btn = filterButtonRefs.current[openColumnFilter!]
+      if (!btn) return
+      const rect = btn.getBoundingClientRect()
+      const popoverWidth = 240
+      const margin = 8
+      const maxLeft = window.innerWidth - popoverWidth - margin
+      setFilterPopoverPosition({
+        top: rect.bottom + margin,
+        left: Math.max(margin, Math.min(rect.left, maxLeft)),
+      })
+    }
+
+    window.addEventListener('scroll', updatePosition, true)
+    window.addEventListener('resize', updatePosition)
+
+    return () => {
+      window.removeEventListener('scroll', updatePosition, true)
+      window.removeEventListener('resize', updatePosition)
+    }
+  }, [openColumnFilter])
+
+const topFilterOptions = useMemo(() => {
+  const unique = (values: Array<string | null | undefined>) =>
+    [...new Set(values.map((value) => value?.trim()).filter(Boolean) as string[])]
+      .sort((a, b) => a.localeCompare(b))
+
+  const byCustomer = customerFilter
+    ? drafts.filter((d) => d.customer_name === customerFilter)
+    : drafts
+
+  const byCustomerAndProject = projectFilter
+    ? byCustomer.filter((d) => d.project_name === projectFilter)
+    : byCustomer
+
+  const byCustomerProjectAndCampaign = campaignFilter
+    ? byCustomerAndProject.filter((d) => d.campaign_name === campaignFilter)
+    : byCustomerAndProject
+
+  return {
+    customers: unique(drafts.map((d) => d.customer_name)),
+    projects: unique(byCustomer.map((d) => d.project_name)),
+    campaigns: unique(byCustomerAndProject.map((d) => d.campaign_name)),
+    fields: unique(byCustomerProjectAndCampaign.map((d) => d.field_name)),
+  }
+}, [drafts, customerFilter, projectFilter, campaignFilter])
+
   const filteredDrafts = useMemo(() => {
     return drafts.filter((draft) => {
+      if (customerFilter && draft.customer_name !== customerFilter) return false
+      if (projectFilter && draft.project_name !== projectFilter) return false
+      if (campaignFilter && draft.campaign_name !== campaignFilter) return false
+      if (fieldFilter && draft.field_name !== fieldFilter) return false
+
       return (Object.entries(columnFilters) as [ColumnKey, string[]][]).every(([key, selected]) => {
         if (!selected.length) return true
 
@@ -225,7 +278,7 @@ export function WorkOrderDraftsPage() {
         return selected.some((value) => value.toLowerCase() === currentValue)
       })
     })
-  }, [drafts, columnFilters])
+  }, [campaignFilter, columnFilters, customerFilter, drafts, fieldFilter, projectFilter])
 
   const sortedDrafts = useMemo(() => {
     if (!sortKey) return filteredDrafts
@@ -255,7 +308,25 @@ export function WorkOrderDraftsPage() {
   }
 
   function toggleColumnFilter(key: ColumnKey) {
-    setOpenColumnFilter((current) => (current === key ? null : key))
+    setOpenColumnFilter((current) => {
+      if (current === key) {
+        setFilterPopoverPosition(null)
+        return null
+      }
+      const btn = filterButtonRefs.current[key]
+      if (btn) {
+        const rect = btn.getBoundingClientRect()
+        const popoverWidth = 240
+        const margin = 8
+        const preferredLeft = rect.left
+        const maxLeft = window.innerWidth - popoverWidth - margin
+        setFilterPopoverPosition({
+          top: rect.bottom + margin,
+          left: Math.max(margin, Math.min(preferredLeft, maxLeft)),
+        })
+      }
+      return key
+    })
   }
 
   function handleFilterChange(key: ColumnKey, value: string, checked: boolean) {
@@ -319,6 +390,10 @@ export function WorkOrderDraftsPage() {
       option.toLowerCase().includes(search),
     )
 
+    const allChecked = visibleOptions.length > 0 && visibleOptions.every((o) => columnFilters[key].includes(o))
+    const someChecked = visibleOptions.some((o) => columnFilters[key].includes(o))
+    const isIndeterminate = someChecked && !allChecked
+
     return (
       <div className="work-order-drafts-columnHeader">
         <div className="work-order-drafts-columnHeaderTop">
@@ -338,6 +413,7 @@ export function WorkOrderDraftsPage() {
 
             <button
               type="button"
+              ref={(el) => { filterButtonRefs.current[key] = el }}
               className={`work-order-drafts-headerBtn ${
                 isFilterActive || isFilterOpen ? 'is-active' : ''
               }`}
@@ -349,8 +425,13 @@ export function WorkOrderDraftsPage() {
           </div>
         </div>
 
-        {isFilterOpen ? (
-          <div ref={filterPopoverRef} className="work-order-drafts-filterPopover">
+        {isFilterOpen && filterPopoverPosition
+          ? createPortal(
+          <div
+            ref={filterPopoverRef}
+            className="work-order-drafts-filterPopover"
+            style={{ position: 'fixed', top: filterPopoverPosition.top, left: filterPopoverPosition.left }}
+          >
             <input
               type="text"
               className="work-order-drafts-filterSearch"
@@ -369,22 +450,44 @@ export function WorkOrderDraftsPage() {
               {visibleOptions.length === 0 ? (
                 <p className="work-order-drafts-filterEmpty">No hay opciones</p>
               ) : (
-                visibleOptions.map((option) => {
-                  const checked = columnFilters[key].includes(option)
+                <>
+                  <label
+                    className="work-order-drafts-filterOption"
+                    style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: '8px' }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={allChecked}
+                      ref={(el) => { if (el) el.indeterminate = isIndeterminate }}
+                      onChange={(event) => {
+                        const checked = event.target.checked
+                        setColumnFilters((current) => ({
+                          ...current,
+                          [key]: checked
+                            ? [...new Set([...current[key], ...visibleOptions])]
+                            : current[key].filter((v) => !visibleOptions.includes(v)),
+                        }))
+                      }}
+                    />
+                    <span>Seleccionar todo</span>
+                  </label>
+                  {visibleOptions.map((option) => {
+                    const checked = columnFilters[key].includes(option)
 
-                  return (
-                    <label key={option} className="work-order-drafts-filterOption">
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={(event) => {
-                          handleFilterChange(key, option, event.target.checked)
-                        }}
-                      />
-                      <span>{option}</span>
-                    </label>
-                  )
-                })
+                    return (
+                      <label key={option} className="work-order-drafts-filterOption">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(event) => {
+                            handleFilterChange(key, option, event.target.checked)
+                          }}
+                        />
+                        <span>{option}</span>
+                      </label>
+                    )
+                  })}
+                </>
               )}
             </div>
 
@@ -396,9 +499,17 @@ export function WorkOrderDraftsPage() {
               >
                 Limpiar
               </button>
+              <button
+                type="button"
+                className="work-order-drafts-filterApplyBtn"
+                onClick={() => { setOpenColumnFilter(null); setFilterPopoverPosition(null) }}
+              >
+                Aplicar
+              </button>
             </div>
 
-          </div>
+          </div>,
+          document.body
         ) : null}
       </div>
     )
@@ -411,51 +522,101 @@ export function WorkOrderDraftsPage() {
           <div className="work-order-drafts-copy">
             <h1 className="work-order-drafts-title">Órdenes digitales</h1>
           </div>
+
+          <Link to="/work-orders" className="work-order-drafts-link">
+            <FilePlus2 aria-hidden="true" />
+            <span>Nueva OT</span>
+          </Link>
         </header>
 
         <section className="work-order-drafts-filters">
           <label className="work-order-drafts-field">
-            <span>Número de orden</span>
-            <input
-              type="text"
-              placeholder="Buscar por número de orden"
-              value={searchNumber}
-              onChange={(event) => {
-                setSearchNumber(event.target.value)
-              }}
-            />
-          </label>
-
-          <label className="work-order-drafts-field">
-            <span>Resultados por página</span>
+            <span>Cliente</span>
             <select
               className="work-order-drafts-select"
-              value={perPage}
+              value={customerFilter}
               onChange={(event) => {
-                const nextPerPage = Number(event.target.value)
-                setPerPage(nextPerPage)
-                setPage(1)
-              }}
+  setCustomerFilter(event.target.value)
+  setProjectFilter('')
+  setCampaignFilter('')
+  setFieldFilter('')
+}}
             >
-              <option value={10}>10</option>
-              <option value={20}>20</option>
-              <option value={50}>50</option>
+              <option value="">Todos los clientes</option>
+              {topFilterOptions.customers.map((customer) => (
+                <option key={customer} value={customer}>{customer}</option>
+              ))}
             </select>
           </label>
 
-          <div className="work-order-drafts-actions">
-            <Link to="/work-orders" className="work-order-drafts-link">
-              + Nueva OT
-            </Link>
-          </div>
+          <label className="work-order-drafts-field">
+            <span>Proyecto</span>
+            <select
+              className="work-order-drafts-select"
+              value={projectFilter}
+              onChange={(event) => {
+  setProjectFilter(event.target.value)
+  setCampaignFilter('')
+  setFieldFilter('')
+}}
+            >
+              <option value="">Todos los proyectos</option>
+              {topFilterOptions.projects.map((project) => (
+                <option key={project} value={project}>{project}</option>
+              ))}
+            </select>
+          </label>
+
+          <label className="work-order-drafts-field">
+            <span>Campaña</span>
+            <select
+              className="work-order-drafts-select"
+              value={campaignFilter}
+              onChange={(event) => {
+  setCampaignFilter(event.target.value)
+  setFieldFilter('')
+}}
+            >
+              <option value="">Todas las campañas</option>
+              {topFilterOptions.campaigns.map((campaign) => (
+                <option key={campaign} value={campaign}>{campaign}</option>
+              ))}
+            </select>
+          </label>
+
+          <label className="work-order-drafts-field">
+            <span>Campo</span>
+            <select
+              className="work-order-drafts-select"
+              value={fieldFilter}
+              onChange={(event) => setFieldFilter(event.target.value)}
+            >
+              <option value="">Todos los campos</option>
+              {topFilterOptions.fields.map((field) => (
+                <option key={field} value={field}>{field}</option>
+              ))}
+            </select>
+          </label>
+
+          <label className="work-order-drafts-field work-order-drafts-searchField">
+            <span>Número de orden</span>
+            <div className="work-order-drafts-searchControl">
+              <Search aria-hidden="true" />
+              <input
+                type="text"
+                placeholder="Buscar por número"
+                value={searchNumber}
+                onChange={(event) => {
+                  setSearchNumber(event.target.value)
+                }}
+              />
+            </div>
+          </label>
         </section>
 
         <section className="work-order-drafts-tableCard">
           <div className="work-order-drafts-tableHeader">
-            <strong>Órdenes digitales cargadas</strong>
-            <span className="work-order-drafts-tableMeta">
-              Página {pageInfo.page} de {pageInfo.max_page} · {pageInfo.total} resultados
-            </span>
+            <strong>Órdenes cargadas</strong>
             {isRefreshingTable ? (
               <span className="work-order-drafts-refreshTag">Actualizando...</span>
             ) : null}
@@ -489,14 +650,13 @@ export function WorkOrderDraftsPage() {
                   <th>{renderColumnHeader('Sup. total', 'effective_area')}</th>
                   <th>{renderColumnHeader('Lotes', 'lots_count')}</th>
                   <th>{renderColumnHeader('Estado', 'status')}</th>
-                  <th className="work-order-drafts-actionsCol">Acción</th>
                 </tr>
               </thead>
 
               <tbody>
                 {!isLoading && sortedDrafts.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="work-order-drafts-empty">
+                    <td colSpan={7} className="work-order-drafts-empty">
                       No hay ordenes digitales para mostrar.
                     </td>
                   </tr>
@@ -522,18 +682,6 @@ export function WorkOrderDraftsPage() {
                         {formatWorkOrderDraftStatus(draft.status)}
                       </span>
                     </td>
-                    <td className="work-order-drafts-actionsCol">
-                      <Link
-                        to={`/work-order-drafts/${draft.id}`}
-                        className="work-order-drafts-actionIconBtn"
-                        aria-label={
-                          draft.status === 'published' ? 'Ver orden' : 'Ver o editar orden'
-                        }
-                        title={draft.status === 'published' ? 'Ver' : 'Ver / Editar'}
-                      >
-                        <ActionIcon />
-                      </Link>
-                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -551,7 +699,7 @@ export function WorkOrderDraftsPage() {
             </button>
 
             <span className="work-order-drafts-pageStatus">
-              Página {pageInfo.page} / {pageInfo.max_page}
+              {pageInfo.page} / {pageInfo.max_page}
             </span>
 
             <button

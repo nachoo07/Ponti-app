@@ -14,6 +14,7 @@
 | GET | `/api/v1/projects/:id` | Project Context | Implemented |
 | GET | `/api/v1/projects/:id/labors` | Operations Catalog | Implemented |
 | POST | `/api/v1/projects/:id/labors` | Operations Catalog | Implemented |
+| POST | `/api/v1/projects/:id/labors/pending` | Operations Catalog | Implemented |
 | GET | `/api/v1/categories` | Operations Catalog | Implemented |
 | GET | `/api/v1/labors` | Operations Catalog | Implemented |
 | GET | `/api/v1/supplies` | Operations Catalog | Implemented |
@@ -39,6 +40,9 @@
 - `GET /api/v1/projects/:id/labors` and `POST /api/v1/projects/:id/labors`
   are owned by `Operations Catalog` even though they are mounted in the projects
   route file.
+- Labor lookup depends on the external Manager/Core schema including
+  `labors.is_pending` from migration `000232_labor_pending_changes`; the BFF
+  keeps the route stable and does not substitute grouped work-order history.
 - All `/api/v1/work-order-drafts/**` routes are owned by `Work Orders`.
 - Health/version are owned by `Platform & Delivery`.
 

@@ -24,7 +24,8 @@
 | Project Context | Field, lot and crop selection from project detail | Implemented |
 | Project Context | Standalone field-by-project client | Stubbed |
 | Operations Catalog | Labor lookup and contractor autofill | Implemented |
-| Operations Catalog | Inline labor creation | Implemented |
+| Operations Catalog | Pending inline labor creation | Implemented |
+| Operations Catalog | Full inline labor creation | Stubbed |
 | Operations Catalog | Supply lookup | Implemented |
 | Operations Catalog | Pending supply creation | Implemented |
 | Operations Catalog | Drawer/new supply button behavior | Stubbed |
@@ -63,7 +64,8 @@
 | Field, lot and crop selection from project detail | `GET /api/v1/projects/:id` |
 | Standalone field-by-project client | No canonical API; client path is stubbed |
 | Labor lookup and contractor autofill | `GET /api/v1/labors?project_id=...`, `GET /api/v1/projects/:id/labors` |
-| Inline labor creation | `GET /api/v1/categories`, `POST /api/v1/projects/:id/labors` |
+| Pending inline labor creation | `POST /api/v1/projects/:id/labors/pending` |
+| Full inline labor creation | `GET /api/v1/categories`, `POST /api/v1/projects/:id/labors` |
 | Supply lookup | `GET /api/v1/supplies?project_id=...` |
 | Pending supply creation | `POST /api/v1/supplies/pending` |
 | Drawer/new supply button behavior | No canonical API; button behavior is stubbed |

@@ -2,6 +2,7 @@ import type { Request } from 'express'
 import { Router } from 'express'
 import { config } from '../config.js'
 import { managerApi } from '../services/http.js'
+import { buildLaborCatalogResponse } from './laborCatalog.js'
 
 const router = Router()
 
@@ -39,7 +40,7 @@ router.get('', async (req, res) => {
       headers,
     })
 
-    res.status(200).json(response.data)
+    res.status(200).json(buildLaborCatalogResponse(response.data))
   } catch (error: any) {
     res.status(error?.response?.status ?? 500).json(
       error?.response?.data ?? {

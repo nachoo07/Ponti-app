@@ -16,22 +16,22 @@ insumos.
 ## Regla esperada
 
 En `POST /api/v1/work-order-drafts/digital/batch`, el `total_used` cargado para
-un insumo representa el consumo total de la OT completa. Si la OT tiene dos
-lotes, ese total no debe copiarse completo a cada suborden.
+un insumo representa el consumo total ingresado para el batch. Si el batch tiene
+dos lotes, ese total no debe copiarse completo a cada suborden.
 
 Ejemplo canonico:
 
 - Lote A: `50 ha`
 - Lote B: `50 ha`
 - Insumo total cargado: `200`
-- Consumo total esperado del grupo: `200`
+- Consumo total esperado del batch: `200`
 - Persistencia esperada: `100 + 100 = 200`
 
 Core valida que todos los lotes compartan el mismo set de insumos, calcula
 `final_dose = total_used / superficie_total`, distribuye `total_used` por area
 efectiva de lote y ajusta el ultimo lote por residuo decimal.
 
-Mobile sigue enviando `total_used` como consumo total de la OT. No debe
+Mobile sigue enviando `total_used` como consumo total del batch. No debe
 predividirlo por lote.
 
 ## Evidencia automatizada

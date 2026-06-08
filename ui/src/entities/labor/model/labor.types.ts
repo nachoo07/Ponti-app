@@ -7,6 +7,19 @@ export type Labor = {
   contractor_name: string
   category_name: string
   updated_at: string
+  is_pending?: boolean
+}
+
+export type CreatePendingLaborPayload = {
+  project_id: number
+  name: string
+}
+
+export type CreatePendingLaborResponse = {
+  id: number
+  name: string
+  is_pending: boolean
+  created: boolean
 }
 
 export type LaborsResponse = {

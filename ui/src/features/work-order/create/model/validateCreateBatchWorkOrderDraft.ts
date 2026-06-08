@@ -37,9 +37,6 @@ export function validateCreateBatchWorkOrderDraft(
     errors.push('Falta completar: Labor.')
   }
 
-  if (!payload.contractor.trim()) {
-    errors.push('Falta completar: Contratista.')
-  }
 
   if (payload.lots.length === 0) {
     errors.push('Falta completar: Lotes.')

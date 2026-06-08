@@ -125,4 +125,27 @@ router.post('/:id/labors', async (req, res) => {
   }
 })
 
+router.post('/:id/labors/pending', async (req, res) => {
+  const headers = getManagerHeaders(req)
+
+  if (!headers) {
+    res.status(401).json({ message: 'Usuario no autenticado' })
+    return
+  }
+
+  try {
+    const response = await managerApi.post(`/projects/${req.params.id}/labors/pending`, req.body, {
+      headers,
+    })
+
+    res.status(response.status ?? 201).json(response.data)
+  } catch (error: any) {
+    res.status(error?.response?.status ?? 500).json(
+      error?.response?.data ?? {
+        message: 'No se pudo crear la labor pendiente',
+      },
+    )
+  }
+})
+
 export default router

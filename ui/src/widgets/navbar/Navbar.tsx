@@ -1,30 +1,33 @@
 import { useState } from 'react'
+import { ClipboardList, FilePlus2, Home, LogOut, Menu, X } from 'lucide-react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../app/providers/AuthContext'
 import styles from './Navbar.module.css'
 
-function getPageTitle(pathname: string) {
-  if (pathname.startsWith('/work-order-drafts/')) {
-    return 'Detalle de orden'
-  }
-
-  if (pathname.startsWith('/work-order-drafts')) {
-    return 'Ordenes digitales'
-  }
-
-  if (pathname.startsWith('/work-orders')) {
-    return 'Nueva OT'
-  }
-
-  return 'Inicio'
-}
+const navItems = [
+  {
+    to: '/home',
+    label: 'Inicio',
+    icon: Home,
+  },
+  {
+    to: '/work-orders',
+    label: 'Nueva OT',
+    icon: FilePlus2,
+  },
+  {
+    to: '/work-order-drafts',
+    label: 'Ver órdenes',
+    icon: ClipboardList,
+  },
+]
 
 export function Navbar() {
   const navigate = useNavigate()
   const location = useLocation()
+  const isHomePage = location.pathname === '/home'
   const { isAuthenticated, session, logout } = useAuth()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
-  const pageTitle = getPageTitle(location.pathname)
 
   function handleLogout() {
     logout()
@@ -36,88 +39,121 @@ export function Navbar() {
     setIsMenuOpen(false)
   }
 
+  const userName = session?.user.name || session?.user.email || 'Usuario autenticado'
+
   return (
     <header className={styles.header}>
-      <nav className={styles.nav}>
-        <div className={styles.topRow}>
-          <div className={styles.brandGroup}>
-            <NavLink to="/home" className={styles.brand} onClick={handleNavigate}>
-              <span className={styles.brandMark}>
-                <img src="/ponti.svg" alt="" aria-hidden="true" />
-              </span>
+      <div className={styles.inner}>
+        <NavLink to="/home" className={styles.brand} onClick={handleNavigate}>
+          <span className={styles.brandMark}>
+            <img src="/ponti.svg" alt="" aria-hidden="true" />
+          </span>
 
-              <span className={styles.brandText}>
-                <strong>Ponti</strong>
-                <small>Operacion digital</small>
-              </span>
-            </NavLink>
+          <span className={styles.brandText}>
+            <strong>Ponti</strong>
+            <small>Operación digital</small>
+          </span>
+        </NavLink>
 
-            <span className={styles.brandDivider} aria-hidden="true" />
-            <span className={styles.pageTitle}>{pageTitle}</span>
+        {!isHomePage ? (
+          <nav className={styles.desktopNav} aria-label="Principal">
+            {navItems.map((item) => {
+              const Icon = item.icon
+
+              if (!isAuthenticated && item.to !== '/home') {
+                return null
+              }
+
+              return (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  className={({ isActive }) =>
+                    `${styles.navLink} ${isActive ? styles.navLinkActive : ''}`
+                  }
+                  onClick={handleNavigate}
+                >
+                  <Icon className={styles.navIcon} aria-hidden="true" />
+                  <span>{item.label}</span>
+                </NavLink>
+              )
+            })}
+          </nav>
+        ) : null}
+
+        {isAuthenticated ? (
+          <div className={styles.desktopSession}>
+            <span className={styles.userInfo}>
+              <span className={styles.userLabel}>Sesión activa</span>
+              <strong>{userName}</strong>
+            </span>
+
+            <button type="button" className={styles.logoutButton} onClick={handleLogout}>
+              <LogOut className={styles.navIcon} aria-hidden="true" />
+              <span>Salir</span>
+            </button>
           </div>
+        ) : null}
 
-          <button
-            type="button"
-            className={styles.menuToggle}
-            aria-label={isMenuOpen ? 'Cerrar menu' : 'Abrir menu'}
-            aria-expanded={isMenuOpen}
-            aria-controls="main-navigation"
-            onClick={() => setIsMenuOpen((current) => !current)}
-          >
-            <span />
-            <span />
-            <span />
-          </button>
-        </div>
-
-        <div
-          id="main-navigation"
-          className={`${styles.menu} ${isMenuOpen ? styles.menuOpen : ''}`}
+        <button
+          type="button"
+          className={styles.menuToggle}
+          aria-label={isMenuOpen ? 'Cerrar menú' : 'Abrir menú'}
+          aria-expanded={isMenuOpen}
+          aria-controls="main-navigation"
+          onClick={() => setIsMenuOpen((current) => !current)}
         >
-          <div className={styles.navLinks}>
-            <NavLink
-              className={({ isActive }) => `${styles.link} ${isActive ? styles.active : ''}`}
-              to="/home"
-              onClick={handleNavigate}
-            >
-              Inicio
-            </NavLink>
+          {isMenuOpen ? (
+            <X className={styles.menuIcon} aria-hidden="true" />
+          ) : (
+            <Menu className={styles.menuIcon} aria-hidden="true" />
+          )}
+        </button>
+      </div>
 
-            {isAuthenticated ? (
-              <NavLink
-                className={({ isActive }) => `${styles.link} ${isActive ? styles.active : ''}`}
-                to="/work-orders"
-                onClick={handleNavigate}
-              >
-                Nueva OT
-              </NavLink>
-            ) : null}
+      <div
+        id="main-navigation"
+        className={`${styles.mobileMenu} ${isMenuOpen ? styles.mobileMenuOpen : ''}`}
+      >
+        <nav className={styles.mobileNav} aria-label="Menú móvil">
+          {!isHomePage
+            ? navItems.map((item) => {
+              const Icon = item.icon
 
-            {isAuthenticated ? (
-              <NavLink
-                className={({ isActive }) => `${styles.link} ${isActive ? styles.active : ''}`}
-                to="/work-order-drafts"
-                onClick={handleNavigate}
-              >
-                Ver ordenes
-              </NavLink>
-            ) : null}
-          </div>
+              if (!isAuthenticated && item.to !== '/home') {
+                return null
+              }
+
+              return (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  className={({ isActive }) =>
+                    `${styles.mobileLink} ${isActive ? styles.mobileLinkActive : ''}`
+                  }
+                  onClick={handleNavigate}
+                >
+                  <Icon className={styles.navIcon} aria-hidden="true" />
+                  <span>{item.label}</span>
+                </NavLink>
+              )
+            })
+            : null}
 
           {isAuthenticated ? (
-            <div className={styles.userSection}>
-              <span className={styles.userInfo}>
-                <span className={styles.userLabel}>Sesión activa</span>
-                <strong>{session?.user.name || session?.user.email || 'Usuario autenticado'}</strong>
-              </span>
-
-              <button type="button" className={styles.linkButton} onClick={handleLogout}>
-                Salir
-              </button>
-            </div>
+            <button type="button" className={styles.mobileLogoutButton} onClick={handleLogout}>
+              <LogOut className={styles.navIcon} aria-hidden="true" />
+              <span>Salir</span>
+            </button>
           ) : null}
-        </div>
-      </nav>
+                  {isAuthenticated ? (
+          <span className={styles.mobileUserInfo}>
+            <span className={styles.userLabel}>Sesión activa</span>
+            <strong>{userName}</strong>
+          </span>
+        ) : null}
+        </nav>
+      </div>
     </header>
   )
 }

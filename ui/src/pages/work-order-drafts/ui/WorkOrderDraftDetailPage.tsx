@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { ArrowLeft, Download, Pencil, Share2 } from 'lucide-react'
 import { downloadWorkOrderDraftGroupPdf } from '../../../entities/workOrderDraft/api/downloadWorkOrderDraftGroupPdf'
 import { downloadWorkOrderDraftPdf } from '../../../entities/workOrderDraft/api/downloadWorkOrderDraftPdf'
 import { getWorkOrderDraftGroupById } from '../../../entities/workOrderDraft/api/getWorkOrderDraftGroupById'
@@ -11,6 +12,24 @@ import { ApiError } from '../../../shared/api/http'
 import { updateWorkOrderDraftGroup } from '../../../entities/workOrderDraft/api/updateWorkOrderDraftGroup'
 import type { UpdateWorkOrderDraftGroupPayload } from '../../../entities/workOrderDraft/model/workOrderDraft.types'
 import './WorkOrderDraftDetailPage.css'
+
+function normalizeDetailDate(value: string | null | undefined): string {
+  const trimmed = value?.trim() ?? ''
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    const [year, month, day] = trimmed.split('-')
+    return `${day}/${month}/${year}`
+  }
+
+  return trimmed || '-'
+}
+
+function displayValue(value: string | number | null | undefined, fallback = '-'): string {
+  if (value === null || value === undefined) return fallback
+
+  const text = String(value).trim()
+  return text || fallback
+}
 
 export function WorkOrderDraftDetailPage() {
   const { id } = useParams()
@@ -171,36 +190,45 @@ export function WorkOrderDraftDetailPage() {
   const isPublished = draft.status === 'published'
   const isGroupedDraft = Boolean(draft.lots && draft.lots.length > 1)
   const canEditGroupedDraft = !isPublished
+  const lotsLabel = draft.lots?.length
+    ? draft.lots.map((lot) => lot.lot_name).join(' y ')
+    : displayValue(initialValues.lotDisplayName)
+  const investorLabel = draft.investor_name
+    ?? (draft.investor_splits?.length
+      ? `${draft.investor_splits.length} inversores`
+      : draft.investor_id
+        ? `Inversor #${draft.investor_id}`
+        : '-')
 
   return (
     <main className="work-order-draft-detail-page">
       <section className="work-order-draft-detail-shell">
+        <Link to="/work-order-drafts" className="work-order-draft-detail-backLink">
+          <ArrowLeft aria-hidden="true" />
+          <span>Volver a órdenes</span>
+        </Link>
+
         <header className="work-order-draft-detail-header">
           <div className="work-order-draft-detail-copy">
-            <p className="work-order-draft-detail-eyebrow">
-              {isPublished ? 'Orden digital publicada' : 'Orden digital abierta'}
-            </p>
             <h1 className="work-order-draft-detail-title">
-              {draft.number ? `${draft.number} · ` : ''}
-              {draft.project_name}
+              {draft.number ?? '-'}
             </h1>
-          </div>
-
-          <div className="work-order-draft-detail-actions">
             <span className={`work-order-draft-detail-status is-${draft.status}`}>
               {formatWorkOrderDraftStatus(draft.status)}
             </span>
+          </div>
+
+          <div className="work-order-draft-detail-actions">
             <button
               type="button"
               className="work-order-draft-detail-editBtn"
               onClick={handleShareDraftPdf}
               disabled={isDownloadingPdf}
             >
+              <Share2 aria-hidden="true" />
               {isDownloadingPdf
                 ? 'Preparando PDF...'
-                : isGroupedDraft
-                  ? 'Compartir PDF completo'
-                  : 'Compartir PDF'}
+                : 'Compartir PDF'}
             </button>
             <button
               type="button"
@@ -208,16 +236,15 @@ export function WorkOrderDraftDetailPage() {
               onClick={handleDownloadDraftPdf}
               disabled={isDownloadingPdf}
             >
+              <Download aria-hidden="true" />
               {isDownloadingPdf
                 ? 'Descargando PDF...'
-                : isGroupedDraft
-                  ? 'Descargar PDF completo'
-                  : 'Descargar PDF'}
+                : 'Descargar PDF'}
             </button>
             {canEditGroupedDraft && !isPublished ? (
               <button
                 type="button"
-                className="work-order-draft-detail-editBtn"
+                className="work-order-draft-detail-editBtn is-primary"
                 onClick={() => {
                   setSaveFeedback(null)
                   setSaveError(null)
@@ -225,12 +252,10 @@ export function WorkOrderDraftDetailPage() {
                   setIsEditing((current) => !current)
                 }}
               >
+                <Pencil aria-hidden="true" />
                 {isEditing ? 'Cancelar edición' : 'Editar'}
               </button>
             ) : null}
-            <Link to="/work-order-drafts" className="work-order-draft-detail-link">
-              Volver a ordenes
-            </Link>
           </div>
         </header>
         {saveError ? (
@@ -273,58 +298,158 @@ export function WorkOrderDraftDetailPage() {
           </div>
         ) : null}
 
-        <section className="work-order-draft-detail-metaCard">
-          <div className="work-order-draft-detail-metaGrid">
-            <article className="work-order-draft-detail-metaItem">
-              <span>Cliente</span>
-              <strong>{draft.customer_name ?? `Cliente #${draft.customer_id}`}</strong>
-            </article>
-            <article className="work-order-draft-detail-metaItem">
-              <span>Proyecto</span>
-              <strong>{draft.project_name}</strong>
-            </article>
-            <article className="work-order-draft-detail-metaItem">
-              <span>Campaña</span>
-              <strong>{draft.campaign_name ?? 'Sin campaña'}</strong>
-            </article>
-            <article className="work-order-draft-detail-metaItem">
-              <span>Campo</span>
-              <strong>{draft.field_name}</strong>
-            </article>
-          </div>
-        </section>
-
-        {draft.lots?.length ? (
-          <section className="work-order-draft-detail-metaCard">
-            <div className="work-order-draft-detail-metaGrid">
-              {draft.lots.map((lot) => (
-                <article key={lot.draft_id} className="work-order-draft-detail-metaItem">
-                  <span>{lot.number}</span>
-                  <strong>{lot.lot_name}</strong>
-                  <small>
-                    {lot.effective_area} ha · {formatWorkOrderDraftStatus(lot.status)}
-                  </small>
-                </article>
-              ))}
-            </div>
+        {isEditing ? (
+          <section className="work-order-draft-detail-formCard">
+            <WorkOrderForm
+              key={`${draft.id}-${isEditing ? 'editing' : 'readonly'}`}
+              initialValues={initialValues}
+              initialDraftId={draft.id}
+              isReadOnly={isPublished || !isEditing}
+              hideContextFields
+              isGroupedDraft={isGroupedDraft}
+              onUpdateDraft={async (draftId, payload) => {
+                await updateWorkOrderDraftGroup(draftId, payload as UpdateWorkOrderDraftGroupPayload)
+              }}
+              onDraftSaved={handleDraftSaved}
+              onDraftSaveError={setSaveError}
+            />
           </section>
-        ) : null}
+        ) : (
+          <>
+            <div className="work-order-draft-detail-contextGrid">
+              <article className="work-order-draft-detail-contextItem">
+                <span>Cliente</span>
+                <strong>{draft.customer_name ?? `Cliente #${draft.customer_id}`}</strong>
+              </article>
+              <article className="work-order-draft-detail-contextItem">
+                <span>Proyecto</span>
+                <strong>{draft.project_name}</strong>
+              </article>
+              <article className="work-order-draft-detail-contextItem">
+                <span>Campaña</span>
+                <strong>{draft.campaign_name ?? 'Sin campaña'}</strong>
+              </article>
+              <article className="work-order-draft-detail-contextItem">
+                <span>Campo</span>
+                <strong>{draft.field_name}</strong>
+              </article>
+            </div>
 
-        <section className="work-order-draft-detail-formCard">
-          <WorkOrderForm
-  key={`${draft.id}-${isEditing ? 'editing' : 'readonly'}`}
-  initialValues={initialValues}
-  initialDraftId={draft.id}
-  isReadOnly={isPublished || !isEditing}
-  hideContextFields
-  isGroupedDraft={isGroupedDraft}
-  onUpdateDraft={async (draftId, payload) => {
-    await updateWorkOrderDraftGroup(draftId, payload as UpdateWorkOrderDraftGroupPayload)
-  }}
-  onDraftSaved={handleDraftSaved}
-  onDraftSaveError={setSaveError}
-/>
-        </section>
+            <div className="work-order-draft-detail-overviewGrid">
+              <article className="work-order-draft-detail-infoCard">
+                <h2>Resumen de trabajo</h2>
+                <div className="work-order-draft-detail-infoGrid">
+                  <div className="work-order-draft-detail-readonlyField">
+                    <span>Lotes</span>
+                    <strong>{lotsLabel}</strong>
+                  </div>
+                  <div className="work-order-draft-detail-readonlyField">
+                    <span>Superficie</span>
+                    <strong>{displayValue(draft.effective_area)} ha</strong>
+                  </div>
+                  <div className="work-order-draft-detail-readonlyField">
+                    <span>Fecha</span>
+                    <strong>{normalizeDetailDate(draft.date)}</strong>
+                  </div>
+                  <div className="work-order-draft-detail-readonlyField">
+                    <span>Labor</span>
+                    <strong title={displayValue(draft.labor_name)}>{displayValue(draft.labor_name)}</strong>
+                  </div>
+                </div>
+              </article>
+
+              <article className="work-order-draft-detail-infoCard">
+                <h2>Detalle operativo</h2>
+                <div className="work-order-draft-detail-infoGrid">
+                  <div className="work-order-draft-detail-readonlyField">
+                    <span>Número de orden</span>
+                    <strong>{displayValue(draft.number)}</strong>
+                  </div>
+                  <div className="work-order-draft-detail-readonlyField">
+                    <span>Contratista</span>
+                    <strong>{displayValue(draft.contractor)}</strong>
+                  </div>
+                  <div className="work-order-draft-detail-readonlyField">
+                    <span>Cultivo actual</span>
+                    <strong>{displayValue(draft.crop_name)}</strong>
+                  </div>
+                  <div className="work-order-draft-detail-readonlyField">
+                    <span>Inversor del labor</span>
+                    <strong>{investorLabel}</strong>
+                  </div>
+                </div>
+              </article>
+            </div>
+
+
+
+
+
+            <section className="work-order-draft-detail-suppliesCard">
+              <h2>Carga de insumos</h2>
+
+              {/* Tabla — visible solo en desktop */}
+              <div className="work-order-draft-detail-suppliesTableWrap">
+                <table className="work-order-draft-detail-suppliesTable">
+                  <thead>
+                    <tr>
+                      <th>Insumo</th>
+                      <th>Total utilizado</th>
+                      <th>Dosis final</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {draft.items.length === 0 ? (
+                      <tr><td colSpan={3}>Sin insumos cargados.</td></tr>
+                    ) : (
+                      draft.items.map((item) => (
+                        <tr key={`${item.supply_id}-${item.supply_name}`}>
+                          <td>{displayValue(item.supply_name, `Insumo #${item.supply_id}`)}</td>
+                          <td>{displayValue(item.total_used)}</td>
+                          <td>{displayValue(item.final_dose)}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Cards — visible solo en mobile */}
+              <div className="work-order-draft-detail-suppliesList">
+                {draft.items.length === 0 ? (
+                  <p className="work-order-draft-detail-suppliesEmpty">Sin insumos cargados.</p>
+                ) : (
+                  draft.items.map((item) => (
+                    <div key={`${item.supply_id}-${item.supply_name}`} className="work-order-draft-detail-supplyItem">
+                      <div className="work-order-draft-detail-readonlyField work-order-draft-detail-supplyName">
+                        <span>Insumo</span>
+                        <strong title={displayValue(item.supply_name, `Insumo #${item.supply_id}`)}>
+                          {displayValue(item.supply_name, `Insumo #${item.supply_id}`)}
+                        </strong>
+                      </div>
+                      <div className="work-order-draft-detail-supplyRow">
+                        <div className="work-order-draft-detail-readonlyField">
+                          <span>Total utilizado</span>
+                          <strong>{displayValue(item.total_used)}</strong>
+                        </div>
+                        <div className="work-order-draft-detail-readonlyField">
+                          <span>Dosis final</span>
+                          <strong>{displayValue(item.final_dose)}</strong>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="work-order-draft-detail-observations">
+                <span>Observaciones</span>
+                <p>{draft.observations?.trim() || 'Sin observaciones cargadas.'}</p>
+              </div>
+            </section>
+          </>
+        )}
+
       </section>
     </main>
   )

@@ -1,9 +1,92 @@
 .wof-page {
-  padding: 24px;
+  width: min(100%, var(--content-max-width));
+  margin: 0 auto;
+  padding: 42px var(--space-page-x) 48px;
 }
 
 .wof-card {
   background: transparent;
+}
+
+.wof-stepCard {
+  display: grid;
+  gap: 20px;
+  min-height: 280px;
+  padding: 28px 26px;
+  border: 1px solid var(--color-border);
+  border-radius: 28px;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.wof-panelHeader {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: 42px;
+}
+
+.wof-panelIcon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  border-radius: 16px;
+  background: var(--color-primary-50);
+  color: var(--color-primary);
+}
+
+.wof-panelIcon svg {
+  width: 22px;
+  height: 22px;
+  stroke-width: 2.4;
+}
+
+.wof-panelHeader h2 {
+  color: var(--color-text);
+  font-size: 1.18rem;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.wof-topbar {
+  display: grid;
+  gap: 22px;
+  margin-bottom: 24px;
+}
+
+.wof-backButton {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 1rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.wof-backButton:hover {
+  color: var(--color-text);
+}
+
+.wof-headingRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 680px;
+  align-items: center;
+  gap: 32px;
+}
+
+.wof-pageTitle {
+  color: var(--color-text);
+  font-size: clamp(3.1rem, 4.7vw, 3.6rem);
+  font-weight: 800;
+  line-height: 0.95;
+  letter-spacing: 0;
 }
 
 .wof-header {
@@ -17,6 +100,20 @@
 .wof-title {
   color: var(--color-text);
   font-size: 1.5rem;
+}
+
+.wof-stepActions.is-end {
+  justify-content: flex-end;
+}
+
+.wof-stepperItem.is-incomplete:not(.is-active) {
+  background: var(--color-warning-light);
+  color: var(--color-warning);
+}
+
+.wof-stepperItem.is-incomplete:not(.is-active) .wof-stepperNumber {
+  background: var(--color-surface);
+  color: var(--color-warning);
 }
 
 .wof-errorCard {
@@ -40,6 +137,100 @@
   gap: 6px;
 }
 
+.wof-stepper {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 24px;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.wof-stepperItem {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  min-width: 0;
+  min-height: 46px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 18px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 0.96rem;
+  font-weight: 800;
+  cursor: pointer;
+  text-align: left;
+}
+
+.wof-stepperItem:hover {
+  background: var(--color-primary-50);
+  color: var(--color-text);
+}
+
+.wof-stepperItem.is-active {
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+}
+
+.wof-stepperItem.is-completed:not(.is-active) {
+  background: var(--color-accent-light);
+  color: var(--color-accent);
+}
+
+.wof-stepperNumber {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  border-radius: var(--radius-full);
+  background: var(--color-primary-50);
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.wof-stepperItem.is-active .wof-stepperNumber {
+  background: rgba(255, 255, 255, 0.16);
+  color: var(--color-text-inverse);
+}
+
+.wof-stepperItem.is-completed:not(.is-active) .wof-stepperNumber {
+  background: var(--color-surface);
+  color: var(--color-accent);
+}
+
+.wof-stepPanel {
+  display: grid;
+  gap: 36px;
+}
+
+
+.wof-stepPanel[hidden] {
+  display: none;
+}
+
+.wof-stepActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.wof-stepActions .wof-primaryBtn {
+  min-width: 132px;
+  min-height: 52px;
+  padding: 0 24px;
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  box-shadow: 0 12px 24px rgba(49, 71, 91, 0.18);
+}
+
 .wof-fieldset {
   min-width: 0;
   margin: 0;
@@ -51,31 +242,56 @@
 
 .wof-grid3 {
   display: grid;
-  gap: 14px;
+  column-gap: 20px;
+  row-gap: 26px;
+}
+
+.wof-workGrid {
+  display: grid;
+  column-gap: 20px;
+  row-gap: 26px;
+  align-items: start;
 }
 
 .wof-field {
   display: grid;
-  gap: 8px;
+  gap: 4px;
 }
 
 .wof-field span {
   color: var(--color-text-secondary);
-  font-size: 0.78rem;
+  font-size: 0.80rem;
   font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 
-.wof-form :is(input, select, textarea) {
+.wof-form :is(input, select) {
   width: 100%;
-  min-height: 48px;
-  padding: 0 15px;
+  height: 52px;
+  min-height: 52px;
+  padding: 0 16px;
   border: 1px solid var(--color-border);
-  border-radius: 16px;
+  border-radius: 18px;
   background: var(--color-surface);
   color: var(--color-text);
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1;
   box-shadow: var(--shadow-xs);
+}
+
+.wof-form textarea {
+  width: 100%;
+  min-height: 40px !important;
+  padding: 14px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.45;
+  box-shadow: var(--shadow-xs);
+  resize: vertical;
 }
 
 .wof-form :is(input, select, textarea):hover:not(:disabled) {
@@ -84,8 +300,8 @@
 
 .wof-form :is(input, select, textarea):focus {
   outline: none;
-  border-color: var(--color-border-focus);
-  box-shadow: var(--shadow-glow);
+  border-color: var(--color-border);
+  box-shadow: var(--shadow-xs);
 }
 
 .wof-form :is(input, select, textarea):disabled {
@@ -106,20 +322,12 @@
   padding-right: 36px;
 }
 
-.wof-form textarea {
-  min-height: 150px;
-  padding: 14px 15px;
-  resize: vertical;
-}
-
 .wof-box {
-  padding: 18px;
+  padding: 20px;
   border: 1px solid var(--color-border);
   border-radius: 24px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(248, 250, 252, 0.9)),
-    var(--color-surface);
-  box-shadow: var(--shadow-sm);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-xs);
 }
 
 .wof-boxHeader,
@@ -128,7 +336,9 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 18px;
+  margin-bottom: 15px;
+  height: 28px;
+
 }
 
 .wof-sectionHeader small,
@@ -161,9 +371,18 @@
   gap: 12px;
 }
 
+.wof-supplyTable {
+  display: grid;
+  overflow: visible;
+}
+
+.wof-lotAreaEditorCompact {
+  grid-template-columns: 1fr;
+}
+
 .wof-splitRow {
   display: grid;
-  gap: 10px;
+  gap: 12px;
 }
 
 .wof-insumoGridHead {
@@ -178,6 +397,14 @@
   border-radius: 20px;
   background: var(--color-surface);
   box-shadow: var(--shadow-xs);
+}
+
+.wof-addSupplyBtn {
+  width: 100%;
+}
+
+.wof-observationsField {
+  margin-top: 4px;
 }
 
 .wof-primaryBtn,
@@ -221,7 +448,7 @@
 }
 
 .wof-dangerBtn {
-  border: 1px solid rgba(220, 38, 38, 0.14);
+  border: 1px solid rgba(239, 97, 93, 0.26);
   background: var(--color-danger-light);
   color: var(--color-danger);
 }
@@ -271,16 +498,34 @@
 
 .wof-lotSelectorTrigger,
 .wof-supplySelectorTrigger {
+  position: relative;
   width: 100%;
-  min-height: 48px;
-  padding: 0 15px;
+  height: 52px;
+  min-height: 52px;
+  padding: 0 36px 0 16px;
   border: 1px solid var(--color-border);
-  border-radius: 16px;
+  border-radius: 18px;
   background: var(--color-surface);
   color: var(--color-text);
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1;
   text-align: left;
   box-shadow: var(--shadow-xs);
   cursor: pointer;
+}
+
+.wof-lotSelectorTrigger::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 18px;
+  width: 9px;
+  height: 9px;
+  border-right: 2px solid var(--color-text-muted);
+  border-bottom: 2px solid var(--color-text-muted);
+  pointer-events: none;
+  transform: translateY(-65%) rotate(45deg);
 }
 
 .wof-lotSelectorTrigger:hover:not(:disabled),
@@ -290,8 +535,9 @@
 
 .wof-lotSelectorTrigger:focus-visible,
 .wof-supplySelectorTrigger:focus-visible {
-  border-color: var(--color-border-focus);
-  box-shadow: var(--shadow-glow);
+  outline: none;
+  border-color: var(--color-border);
+  box-shadow: var(--shadow-xs);
 }
 
 .wof-lotSelectorTrigger:disabled,
@@ -367,33 +613,40 @@
   white-space: nowrap;
 }
 
-.wof-summaryGrid {
-  display: grid;
-  gap: 14px;
-  align-items: start;
-}
-
 .wof-fixedField {
   min-width: 0;
 }
 
 .wof-lotAreaChip {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 88px;
+  grid-template-columns: minmax(0, 1fr) 118px;
   align-items: center;
-  gap: 10px;
-  padding: 0 14px;
+  height: 52px;
+  min-height: 52px;
   border: 1px solid var(--color-border);
-  border-radius: 14px;
+  border-radius: 18px;
   background: var(--color-surface);
   box-shadow: var(--shadow-xs);
+  overflow: hidden;
+}
+
+.wof-lotAreaChip input {
+  height: 52px;
+  min-height: 52px;
+  border-top: 0;
+  border-right: 0;
+  border-bottom: 0;
+  border-radius: 0;
+  box-shadow: none;
+  text-align: center;
 }
 
 .wof-lotAreaChipName {
   min-width: 0;
-  color: var(--color-text);
+  padding: 0 16px;
+  color: var(--color-text-secondary);
   font-size: 0.86rem;
-  font-weight: 700;
+  font-weight: 800;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -417,18 +670,33 @@
 
 .wof-pendingSupplyCard {
   display: grid;
-  gap: 12px;
-  margin: 12px;
-  padding: 14px;
+  gap: 8px;
+  margin: 8px 10px;
+  padding: 10px;
   border: 1px solid var(--color-border);
-  border-radius: 18px;
+  border-radius: 14px;
   background: rgba(248, 250, 252, 0.94);
+}
+
+.wof-pendingSupplyCard input {
+  height: 38px;
+  min-height: 38px;
+  border-radius: 13px;
+  font-size: 0.88rem;
 }
 
 .wof-pendingSupplyActions {
   display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.wof-pendingSupplyActions .wof-secondaryBtn,
+.wof-pendingSupplyActions .wof-dangerBtn {
+  flex: 1 1 0;
+  min-height: 34px;
+  padding: 0 12px;
+  font-size: 0.84rem;
 }
 
 .wof-supplyTriggerValue {
@@ -465,34 +733,68 @@
 
 .wof-supplySelectorPopover {
   top: calc(100% + 10px);
-  width: min(320px, 100%);
-  max-height: 320px;
-  overflow-y: auto;
-  padding-bottom: 8px;
+  width: 100%;
+  overflow: visible;
+  padding-bottom: 6px;
 }
 
 .wof-supplySearchInput {
-  width: calc(100% - 24px) !important;
-  margin: 12px !important;
+  width: calc(100% - 20px) !important;
+  height: 40px !important;
+  min-height: 40px !important;
+  margin: 10px !important;
+  border-radius: 14px !important;
+  font-size: 0.9rem !important;
 }
 
 .wof-supplyCreateAction {
   width: 100%;
-  min-height: 44px;
+  min-height: 38px;
   border-top: 1px solid var(--color-border-light);
   border-bottom: 1px solid var(--color-border-light);
   background: transparent;
   color: var(--color-primary-dark);
-  font-size: 0.94rem;
+  font-size: 0.9rem;
   font-weight: 700;
   text-align: left;
-  padding: 0 16px;
+  padding: 0 14px;
   cursor: pointer;
+}
+
+/* Creador inline de labor: vive bajo el campo Labor (no dentro de un popover),
+   por eso ocupa toda la fila del summaryGrid y usa su propio botón sin los
+   bordes del popover de insumos. */
+.wof-laborCreate {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.wof-laborCreateAction {
+  justify-self: start;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+  color: var(--color-primary-dark);
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.wof-laborCreateAction:hover {
+  background: var(--color-surface-hover);
 }
 
 .wof-supplyOptionList {
   max-height: 240px;
   overflow-y: auto;
+}
+
+.wof-finalActions {
+  justify-content: space-between;
 }
 
 .wof-supplyOption {
@@ -501,7 +803,7 @@
   border-bottom: 1px solid var(--color-border-light);
   background: transparent;
   text-align: left;
-  padding: 14px 16px;
+  padding: 12px 14px;
   display: flex;
   align-items: baseline;
   justify-content: space-between;
@@ -632,16 +934,38 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  .wof-workGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-areas:
+      'field lots lotAreas'
+      'cultures surface lotAreas'
+      'labor contractor lotAreas';
+  }
+
+  .wof-workField {
+    grid-area: field;
+  }
+
+  .wof-workLots {
+    grid-area: lots;
+  }
+
   .wof-splitRow {
-    grid-template-columns: minmax(0, 2fr) minmax(120px, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) minmax(180px, 0.5fr) 140px;
     align-items: center;
   }
 
   .wof-insumoGridHead {
     display: grid;
     grid-template-columns: 2fr 1.2fr 1.2fr 0.9fr;
-    gap: 10px;
-    padding: 0 6px;
+    gap: 14px;
+    min-height: 42px;
+    align-items: center;
+    padding: 0 20px;
+    border: 1px solid var(--color-border);
+    border-bottom: 0;
+    border-radius: 18px 18px 0 0;
+    background: var(--color-primary-50);
     color: var(--color-text-secondary);
     font-size: 0.78rem;
     font-weight: 800;
@@ -652,17 +976,34 @@
   .wof-insumoRow {
     grid-template-columns: 2fr 1.2fr 1.2fr 0.9fr;
     align-items: center;
+    gap: 14px;
+    min-height: 78px;
+    padding: 14px 16px;
+    border-top: 1px solid var(--color-border);
+    border-right: 1px solid var(--color-border);
+    border-bottom: 0;
+    border-left: 1px solid var(--color-border);
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .wof-insumoRow:last-child {
+    border-bottom: 1px solid var(--color-border);
+    border-radius: 0 0 18px 18px;
+  }
+
+  .wof-insumoRow :is(input, .wof-supplySelectorTrigger, .wof-dangerBtn) {
+    min-height: 50px;
+    height: 50px;
+  }
+
+  .wof-insumoRow .wof-dangerBtn {
+    width: 100%;
+    padding: 0 16px;
   }
 
   .wof-actionsCol {
     text-align: center;
-  }
-
-  .wof-summaryGrid {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(260px, 0.9fr);
-    grid-template-areas:
-      'cultures surface lots'
-      'labor contractor lots';
   }
 
   .wof-summaryCultures {
@@ -674,7 +1015,8 @@
   }
 
   .wof-summaryLots {
-    grid-area: lots;
+    grid-area: lotAreas;
+    align-self: start;
   }
 
   .wof-summaryLabor {
@@ -688,7 +1030,51 @@
 
 @media (max-width: 760px) {
   .wof-page {
-    padding: 18px 14px 24px;
+    padding-top: 28px;
+  }
+
+  .wof-headingRow {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .wof-pageTitle {
+    font-size: 2.5rem;
+  }
+
+  .wof-stepCard {
+    padding: 22px;
+    border-radius: 24px;
+  }
+
+  .wof-panelHeader {
+    align-items: flex-start;
+  }
+
+  .wof-panelIcon {
+    width: 44px;
+    height: 44px;
+  }
+
+  .wof-stepper {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+    padding: 6px;
+    border-radius: 18px;
+  }
+
+  .wof-stepperItem {
+    justify-content: center;
+    min-height: 42px;
+    padding: 0 5px;
+    border-radius: 14px;
+    font-size: clamp(0.68rem, 2.55vw, 0.78rem);
+  }
+
+  .wof-stepperNumber {
+    width: 24px;
+    height: 24px;
+    font-size: 0.68rem;
   }
 
   .wof-box {
@@ -696,13 +1082,51 @@
     border-radius: 20px;
   }
 
-  .wof-boxHeader,
-  .wof-sectionHeader {
-    flex-direction: column;
+  .wof-stepperItem span:last-child {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+ .wof-sectionHeader {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.wof-boxHeader {
+  flex-direction: row;
+  align-items: center;
+  min-height: 32px;
+  height: auto;
+  margin-bottom: 18px;
+}
+
+.wof-boxHeader .wof-checkRow {
+  justify-content: flex-end;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.wof-checkRow input {
+  width: 16px;
+  height: 16px;
+  min-height: 16px;
+  flex: 0 0 auto;
+}
+
+  .wof-footerActions>* {
+    width: 100%;
+  }
+
+  .wof-stepActions,
+  .wof-footerActions {
+    flex-direction: column-reverse;
     align-items: stretch;
   }
 
-  .wof-footerActions > * {
+  .wof-stepActions .wof-primaryBtn,
+  .wof-stepActions .wof-secondaryBtn {
     width: 100%;
   }
 
@@ -727,4 +1151,37 @@
     min-width: auto;
     max-width: none;
   }
+}
+
+/* ── Success screen ─────────────────────────────────────── */
+
+.wof-successScreen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  padding: 56px 32px 48px;
+  text-align: center;
+  border: 1px solid var(--color-border);
+  border-radius: 28px;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.wof-successTitle {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.wof-successSubtitle {
+  font-size: 1rem;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.wof-successScreen .wof-footerActions {
+  justify-content: center;
+  flex-wrap: wrap;
 }

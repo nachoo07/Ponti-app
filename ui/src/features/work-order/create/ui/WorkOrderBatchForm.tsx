@@ -1,5 +1,7 @@
 import { FilePlus2, ClipboardList, Sprout } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { createPendingLabor } from '../../../../entities/labor/api/createPendingLabor'
 import type { Labor } from '../../../../entities/labor/model/labor.types'
 import type { InvestorSplit, Lot } from '../../../../entities/project/model/project.types'
 import { getProjectStock } from '../../../../entities/stock/api/getProjectStock'
@@ -17,8 +19,9 @@ import type { BatchSelectedLotFormRow, BatchSharedSupplyFormRow, } from '../mode
 import { useWorkOrderWorkspace } from '../model/useWorkOrderWorkspace'
 import { validateCreateBatchWorkOrderDraft } from '../model/validateCreateBatchWorkOrderDraft'
 import './WorkOrderForm.css'
-import { getTodayDateInputValue, formatDose, formatTotalUsedFromDose, formatCalculatedDecimal, buildEmptySupplyRow, buildInitialSupplyRows, buildSelectedLotFormRow, normalizeDecimalInput, normalizeDoseInput  } from '../model/workOrderBatchForm.helpers'
+import { getTodayDateInputValue, formatDose, formatTotalUsedFromDose, formatCalculatedDecimal, buildEmptySupplyRow, buildInitialSupplyRows, buildSelectedLotFormRow, normalizeDecimalInput, normalizeDoseInput, insertSortedById } from '../model/workOrderBatchForm.helpers'
 import { InvestorSplitSection } from './InvestorSplitSection'
+import { LaborSelector } from './LaborSelector'
 import { LotSelectorDropdown } from './LotSelectorDropdown'
 import { SupplyRowsTable } from './SupplyRowsTable'
 
@@ -63,9 +66,16 @@ export function WorkOrderBatchForm() {
     const [isLotSelectorOpen, setIsLotSelectorOpen] = useState(false)
     const lotSelectorRef = useRef<HTMLDivElement | null>(null)
     const formTopRef = useRef<HTMLDivElement | null>(null)
+    const navigate = useNavigate()
 
     const [selectedLaborId, setSelectedLaborId] = useState<number | ''>('')
     const [contractor, setContractor] = useState('')
+    const [isLaborSelectorOpen, setIsLaborSelectorOpen] = useState(false)
+    const [laborSearch, setLaborSearch] = useState('')
+    const [isCreatingLaborOpen, setIsCreatingLaborOpen] = useState(false)
+    const [newLaborName, setNewLaborName] = useState('')
+    const [isSavingLabor, setIsSavingLabor] = useState(false)
+    const [laborCreateError, setLaborCreateError] = useState<string | null>(null)
     const [selectedInvestorId, setSelectedInvestorId] = useState<number | ''>('')
     const [splitContribution, setSplitContribution] = useState(false)
     const [investorSplits, setInvestorSplits] = useState<InvestorSplit[]>([
@@ -97,7 +107,6 @@ export function WorkOrderBatchForm() {
     const [isSavingDraft, setIsSavingDraft] = useState(false)
     const [isDownloadingGroupPdf, setIsDownloadingGroupPdf] = useState(false)
     const [saveDraftError, setSaveDraftError] = useState<string | null>(null)
-    const [saveDraftSuccessMessage, setSaveDraftSuccessMessage] = useState<string | null>(null)
     const [groupPdfError, setGroupPdfError] = useState<string | null>(null)
     const [validationErrors, setValidationErrors] = useState<string[]>([])
     const [createdDrafts, setCreatedDrafts] = useState<CreatedBatchDraft[]>([])
@@ -105,8 +114,7 @@ export function WorkOrderBatchForm() {
     const [currentStep, setCurrentStep] = useState<FormStep>(1)
     const [showSuccessScreen, setShowSuccessScreen] = useState(false)
 
-    const toastMessage = groupPdfError ?? saveDraftError ?? saveDraftSuccessMessage
-    const toastVariant = groupPdfError || saveDraftError ? 'error' : 'success'
+    const toastMessage = groupPdfError ?? saveDraftError
 
     const {
         customers,
@@ -127,6 +135,7 @@ export function WorkOrderBatchForm() {
         isLoadingProjectDetail,
         projectDetailError,
         labors,
+        setLabors,
         isLoadingLabors,
         laborsError,
         resetWorkspaceSelection,
@@ -135,6 +144,14 @@ export function WorkOrderBatchForm() {
         onProjectChange: resetProjectDependentSelections,
     })
 
+    function resetLaborCreatorFields() {
+        setIsLaborSelectorOpen(false)
+        setIsCreatingLaborOpen(false)
+        setNewLaborName('')
+        setLaborSearch('')
+        setLaborCreateError(null)
+    }
+
     function resetProjectDependentSelections() {
         setSelectedFieldId('')
         setAvailableLots([])
@@ -142,6 +159,7 @@ export function WorkOrderBatchForm() {
         setSelectedLots([])
         setSelectedLaborId('')
         setContractor('')
+        resetLaborCreatorFields()
         setSelectedInvestorId('')
         setSplitContribution(false)
         setInvestorSplits([{ investor_id: '', percentage: '' }])
@@ -159,7 +177,6 @@ export function WorkOrderBatchForm() {
         setNumberPreviewError(null)
         setValidationErrors([])
         setCreatedDrafts([])
-        setSaveDraftSuccessMessage(null)
         setSaveDraftError(null)
         setGroupPdfError(null)
     }
@@ -173,6 +190,7 @@ export function WorkOrderBatchForm() {
         setSelectedLots([])
         setSelectedLaborId('')
         setContractor('')
+        resetLaborCreatorFields()
         setSelectedInvestorId('')
         setSplitContribution(false)
         setInvestorSplits([{ investor_id: '', percentage: '' }])
@@ -267,7 +285,6 @@ export function WorkOrderBatchForm() {
         if (!toastMessage) return
 
         const timeoutId = window.setTimeout(() => {
-            setSaveDraftSuccessMessage(null)
             setSaveDraftError(null)
             setGroupPdfError(null)
         }, 4500)
@@ -411,7 +428,6 @@ export function WorkOrderBatchForm() {
 
     function handleToggleLot(lot: Lot, checked: boolean) {
         setCreatedDrafts([])
-        setSaveDraftSuccessMessage(null)
 
         if (checked) {
             setSelectedLots((current) => {
@@ -621,15 +637,7 @@ export function WorkOrderBatchForm() {
                 type_name: '',
             }
 
-            setSupplies((current) => {
-                const alreadyExists = current.some((item) => item.id === nextSupply.id)
-
-                if (alreadyExists) {
-                    return current
-                }
-
-                return [...current, nextSupply].sort((a, b) => a.name.localeCompare(b.name))
-            })
+            setSupplies((current) => insertSortedById(current, nextSupply))
 
             updateSupplyRow(pendingSupplyRowId, {
                 supply_id: response.id,
@@ -646,6 +654,61 @@ export function WorkOrderBatchForm() {
         }
     }
 
+    function handleOpenLaborCreator() {
+        setIsCreatingLaborOpen(true)
+        setNewLaborName(laborSearch.trim())
+        setLaborCreateError(null)
+    }
+
+    function handleCloseLaborCreator() {
+        setIsCreatingLaborOpen(false)
+        setNewLaborName('')
+        setLaborCreateError(null)
+    }
+
+    async function handleCreatePendingLabor() {
+        if (selectedProjectId === '') return
+
+        const normalizedName = newLaborName.trim()
+        if (!normalizedName) {
+            setLaborCreateError('Ingresá un nombre para la labor.')
+            return
+        }
+
+        setIsSavingLabor(true)
+        setLaborCreateError(null)
+
+        try {
+            const created = await createPendingLabor({
+                project_id: selectedProjectId as number,
+                name: normalizedName,
+            })
+
+            const nextLabor: Labor = {
+                id: created.id,
+                name: created.name,
+                category_id: 0,
+                price: '0',
+                is_partial_price: false,
+                contractor_name: '',
+                category_name: '',
+                updated_at: '',
+                is_pending: true,
+            }
+
+            setLabors((current) => insertSortedById(current, nextLabor))
+            setSelectedLaborId(created.id)
+            setContractor('')
+            resetLaborCreatorFields()
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'No se pudo crear la labor.'
+            setLaborCreateError(message)
+        } finally {
+            setIsSavingLabor(false)
+        }
+    }
+
+
     function scrollToFormTop() {
         if (!formTopRef.current) return
 
@@ -659,11 +722,23 @@ export function WorkOrderBatchForm() {
     }
 
     function goToStep(nextStep: FormStep) {
+        if (nextStep > currentStep) {
+            for (let s = currentStep; s < nextStep; s++) {
+                const errors = validateStep(s as FormStep)
+                if (errors.length > 0) {
+                    setValidationErrors(errors)
+                    scrollToFormTop()
+                    return
+                }
+            }
+        }
+        setValidationErrors([])
         setCurrentStep(nextStep)
         scrollToFormTop()
     }
 
     function goToPreviousStep() {
+        setValidationErrors([])
         setCurrentStep((step) => {
             if (step === 1) return 1
             return (step - 1) as FormStep
@@ -671,7 +746,41 @@ export function WorkOrderBatchForm() {
         scrollToFormTop()
     }
 
+    function validateStep(step: FormStep): string[] {
+        const errors: string[] = []
+
+        if (step === 1) {
+            if (typeof selectedCustomerId !== 'number') errors.push('Falta seleccionar: Cliente.')
+            if (typeof selectedProjectId !== 'number') errors.push('Falta seleccionar: Proyecto.')
+            if (!workOrderNumber.trim()) errors.push('Falta completar: Nro. Orden.')
+            if (!workOrderDate.trim()) errors.push('Falta completar: Fecha.')
+        }
+
+        if (step === 2) {
+            if (typeof selectedFieldId !== 'number') errors.push('Falta seleccionar: Campo.')
+            if (selectedLots.length === 0) errors.push('Falta seleccionar al menos un lote.')
+            if (typeof selectedLaborId !== 'number') errors.push('Falta seleccionar: Labor.')
+            if (splitContribution) {
+                const hasValidSplit = investorSplits.some(
+                    (s) => s.investor_id !== '' && s.percentage !== '',
+                )
+                if (!hasValidSplit) errors.push('Falta completar: Contribución por inversor.')
+            } else {
+                if (selectedInvestorId === '') errors.push('Falta seleccionar: Inversor.')
+            }
+        }
+
+        return errors
+    }
+
     function goToNextStep() {
+        const errors = validateStep(currentStep)
+        if (errors.length > 0) {
+            setValidationErrors(errors)
+            scrollToFormTop()
+            return
+        }
+        setValidationErrors([])
         setCurrentStep((step) => {
             if (step === 3) return 3
             return (step + 1) as FormStep
@@ -708,7 +817,6 @@ export function WorkOrderBatchForm() {
                 missingCommonFields.map((field) => `Falta completar: ${field}.`),
             )
             setSaveDraftError(null)
-            setSaveDraftSuccessMessage(null)
             scrollToFormTop()
             return
         }
@@ -723,7 +831,6 @@ export function WorkOrderBatchForm() {
         if (!selectedLabor) {
             setValidationErrors(['No se encontró la labor seleccionada.'])
             setSaveDraftError(null)
-            setSaveDraftSuccessMessage(null)
             scrollToFormTop()
             return
         }
@@ -755,7 +862,6 @@ export function WorkOrderBatchForm() {
         if (errors.length > 0) {
             setValidationErrors(errors)
             setSaveDraftError(null)
-            setSaveDraftSuccessMessage(null)
             scrollToFormTop()
             return
         }
@@ -763,11 +869,19 @@ export function WorkOrderBatchForm() {
         setIsSavingDraft(true)
         setValidationErrors([])
         setSaveDraftError(null)
-        setSaveDraftSuccessMessage(null)
         setGroupPdfError(null)
 
         try {
             const response = await createBatchWorkOrderDraft(payload)
+
+            if (!response.items || response.items.length === 0) {
+                // Respuesta exitosa pero sin órdenes: no reseteamos el form ni mostramos
+                // la confirmación (quedaría muda). Avisamos vía toast de error.
+                setSaveDraftError('No se creó ninguna orden. Revisá los datos e intentá de nuevo.')
+                scrollToFormTop()
+                return
+            }
+
             const createdByLotId = new Map(selectedLots.map((lot) => [lot.lot_id, lot.lot_name]))
 
             setCreatedDrafts(
@@ -775,9 +889,6 @@ export function WorkOrderBatchForm() {
                     ...item,
                     lot_name: item.lot_name ?? createdByLotId.get(item.lot_id) ?? `Lote #${item.lot_id}`,
                 })),
-            )
-            setSaveDraftSuccessMessage(
-                `Se creo ${response.items.length} ordenes digitales.`,
             )
             setShowSuccessScreen(true)
         } catch (error) {
@@ -789,6 +900,17 @@ export function WorkOrderBatchForm() {
             setIsSavingDraft(false)
         }
 
+    }
+
+    function handleCreateNewOrder() {
+        setCreatedDrafts([])
+        setGroupPdfError(null)
+        resetFormAfterCreate()
+        scrollToFormTop()
+    }
+
+    function handleGoHome() {
+        navigate('/home')
     }
 
     async function handleDownloadCreatedPdf() {
@@ -858,57 +980,65 @@ export function WorkOrderBatchForm() {
     }
 
     if (showSuccessScreen) {
-        return (
-            <div className={styles.page}>
-                <div className={styles.card}>
-                    <div className="wof-successScreen">
-                        <h1 className="wof-successTitle">✅ ¡OT creada con éxito!</h1>
-                        <p className="wof-successSubtitle">
-                            Se {createdDrafts.length === 1 ? 'creó' : 'crearon'}{' '}
-                            <strong>{createdDrafts.length}</strong>{' '}
-                            {createdDrafts.length === 1 ? 'orden digital.' : 'órdenes digitales.'}
-                        </p>
+    return (
+        <div className={styles.page}>
+            <div className={styles.card}>
+                <div className="wof-successScreen">
+                    <h1 className="wof-successTitle">✅ ¡OT creada con éxito!</h1>
+                    <p className="wof-successSubtitle">
+                        Se {createdDrafts.length === 1 ? 'creó' : 'crearon'}{' '}
+                        <strong>{createdDrafts.length}</strong>{' '}
+                        {createdDrafts.length === 1 ? 'orden digital.' : 'órdenes digitales.'}
+                    </p>
 
-                        <div className={styles.footerActions}>
-                            <button
-                                type="button"
-                                className={styles.secondaryBtn}
-                                onClick={handleShareGroupPdf}
-                                disabled={isDownloadingGroupPdf}
-                            >
-                                {isDownloadingGroupPdf ? 'Preparando PDF...' : 'Compartir PDF'}
-                            </button>
-
-                            <button
-                                type="button"
-                                className={styles.secondaryBtn}
-                                onClick={handleDownloadCreatedPdf}
-                                disabled={isDownloadingGroupPdf}
-                            >
-                                {isDownloadingGroupPdf ? 'Descargando PDF...' : 'Descargar PDF'}
-                            </button>
-
-                            <button
-                                type="button"
-                                className={styles.primaryBtn}
-                                onClick={() => {
-                                    resetFormAfterCreate()
-                                    setCurrentStep(1)
-                                    setShowSuccessScreen(false)
-                                }}
-                            >
-                                Nueva OT
-                            </button>
-                        </div>
-
-                        {groupPdfError ? (
-                            <small className="wof-inlineError">{groupPdfError}</small>
-                        ) : null}
+                    <div className="wof-confirmationActions">
+                        <button
+                            type="button"
+                            className={styles.primaryBtn}
+                            onClick={() => {
+                                resetFormAfterCreate()
+                                setCurrentStep(1)
+                                setShowSuccessScreen(false)
+                            }}
+                        >
+                            Crear nueva OT
+                        </button>
+                        <button
+                            type="button"
+                            className={styles.secondaryBtn}
+                            onClick={handleGoHome}
+                        >
+                            Volver al inicio
+                        </button>
                     </div>
+
+                    <div className="wof-confirmationSecondary">
+                        <button
+                            type="button"
+                            className={styles.secondaryBtn}
+                            onClick={handleShareGroupPdf}
+                            disabled={isDownloadingGroupPdf}
+                        >
+                            {isDownloadingGroupPdf ? 'Preparando PDF...' : 'Compartir PDF'}
+                        </button>
+                        <button
+                            type="button"
+                            className={styles.secondaryBtn}
+                            onClick={handleDownloadCreatedPdf}
+                            disabled={isDownloadingGroupPdf}
+                        >
+                            {isDownloadingGroupPdf ? 'Descargando PDF...' : 'Descargar PDF'}
+                        </button>
+                    </div>
+
+                    {groupPdfError ? (
+                        <small className="wof-inlineError">{groupPdfError}</small>
+                    ) : null}
                 </div>
             </div>
-        )
-    }
+        </div>
+    )
+}
 
     return (
         <div className={styles.page}>
@@ -957,16 +1087,15 @@ export function WorkOrderBatchForm() {
 
             {toastMessage ? (
 
-                <div className={`wof-toast is-${toastVariant}`} role="status" aria-live="polite">
+                <div className="wof-toast is-error" role="status" aria-live="polite">
                     <div className="wof-toastContent">
-                        <strong>{toastVariant === 'success' ? 'Listo' : 'Atención'}</strong>
+                        <strong>Atención</strong>
                         <span>{toastMessage}</span>
                     </div>
                     <button
                         type="button"
                         className="wof-toastClose"
                         onClick={() => {
-                            setSaveDraftSuccessMessage(null)
                             setSaveDraftError(null)
                             setGroupPdfError(null)
                         }}
@@ -978,365 +1107,371 @@ export function WorkOrderBatchForm() {
             ) : null}
 
             <div className={styles.card}>
-                {validationErrors.length > 0 ? (
-                    <section className="wof-errorCard">
-                        <strong>Revisá estos datos antes de continuar:</strong>
-                        <ul className="wof-errorList">
-                            {validationErrors.map((validationError) => (
-                                <li key={validationError}>{validationError}</li>
-                            ))}
-                        </ul>
-                    </section>
-                ) : null}
-                <form className={styles.form}>
-                    <fieldset className="wof-fieldset">
-                        <div className="wof-stepPanel" hidden={currentStep !== 1}>
-                            <div className="wof-stepCard">
-                                <div className="wof-panelHeader">
-                                    <span className="wof-panelIcon" aria-hidden="true">
-                                        <FilePlus2 />
-                                    </span>
-                                    <h2>Información inicial</h2>
-                                </div>
-                                <div className={styles.grid3}>
-                                    <label className={styles.field}>
-                                        <span>Cliente</span>
-                                        <select
-                                            value={selectedCustomerId}
-                                            onChange={(event) => {
-                                                handleCustomerChange(event.target.value)
-                                            }}
-                                            disabled={isLoadingCustomers || !!customersError}
-                                        >
-                                            <option value="" disabled>
-                                                Seleccionar...
-                                            </option>
+                 <>
+        {validationErrors.length > 0 ? (
+            <section className="wof-errorCard">
+                <strong>Revisá estos datos antes de continuar:</strong>
+                <ul className="wof-errorList">
+                    {validationErrors.map((validationError) => (
+                        <li key={validationError}>{validationError}</li>
+                    ))}
+                </ul>
+            </section>
+        ) : null}
+                        <form className={styles.form}>
+                            <fieldset className="wof-fieldset">
+                                <div className="wof-stepPanel" hidden={currentStep !== 1}>
+                                    <div className="wof-stepCard">
+                                        <div className="wof-panelHeader">
+                                            <span className="wof-panelIcon" aria-hidden="true">
+                                                <FilePlus2 />
+                                            </span>
+                                            <h2>Información inicial</h2>
+                                        </div>
+                                        <div className={styles.grid3}>
+                                            <label className={styles.field}>
+                                                <span>Cliente</span>
+                                                <select
+                                                    value={selectedCustomerId}
+                                                    onChange={(event) => {
+                                                        handleCustomerChange(event.target.value)
+                                                    }}
+                                                    disabled={isLoadingCustomers || !!customersError}
+                                                >
+                                                    <option value="" disabled>
+                                                        Seleccionar...
+                                                    </option>
 
-                                            {customers.map((customer) => (
-                                                <option key={customer.id} value={customer.id}>
-                                                    {customer.name}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        {customersError ? <small>{customersError}</small> : null}
-                                    </label>
+                                                    {customers.map((customer) => (
+                                                        <option key={customer.id} value={customer.id}>
+                                                            {customer.name}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                {customersError ? <small>{customersError}</small> : null}
+                                            </label>
 
-                                    <label className={styles.field}>
-                                        <span>Proyecto</span>
-                                        <select
-                                            value={selectedProjectId}
-                                            onChange={(event) => {
-                                                handleProjectChange(event.target.value)
-                                            }}
-                                            disabled={!selectedCustomerId || isLoadingProjects || !!projectsError}
-                                        >
-                                            <option value="" disabled>
-                                                Seleccionar...
-                                            </option>
+                                            <label className={styles.field}>
+                                                <span>Proyecto</span>
+                                                <select
+                                                    value={selectedProjectId}
+                                                    onChange={(event) => {
+                                                        handleProjectChange(event.target.value)
+                                                    }}
+                                                    disabled={!selectedCustomerId || isLoadingProjects || !!projectsError}
+                                                >
+                                                    <option value="" disabled>
+                                                        Seleccionar...
+                                                    </option>
 
-                                            {projects.map((project) => (
-                                                <option key={project.id} value={project.id}>
-                                                    {project.name}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        {projectsError ? <small>{projectsError}</small> : null}
-                                    </label>
+                                                    {projects.map((project) => (
+                                                        <option key={project.id} value={project.id}>
+                                                            {project.name}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                {projectsError ? <small>{projectsError}</small> : null}
+                                            </label>
 
-                                    <label className={styles.field}>
-                                        <span>Campaña</span>
-                                        <select
-                                            value={selectedCampaignId}
-                                            onChange={(event) => {
-                                                const value = event.target.value
-                                                setSelectedCampaignId(value ? Number(value) : '')
-                                            }}
-                                            disabled={!selectedProject || isLoadingCampaigns || !!campaignsError}
-                                        >
-                                            <option value="">
-                                                Seleccionar...
-                                            </option>
+                                            <label className={styles.field}>
+                                                <span>Campaña</span>
+                                                <select
+                                                    value={selectedCampaignId}
+                                                    onChange={(event) => {
+                                                        const value = event.target.value
+                                                        setSelectedCampaignId(value ? Number(value) : '')
+                                                    }}
+                                                    disabled={!selectedProject || isLoadingCampaigns || !!campaignsError}
+                                                >
+                                                    <option value="">
+                                                        Seleccionar...
+                                                    </option>
 
-                                            {campaigns.map((campaign) => (
-                                                <option key={campaign.id} value={campaign.id}>
-                                                    {campaign.name}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        {campaignsError ? <small>{campaignsError}</small> : null}
-                                    </label>
-                                </div>
+                                                    {campaigns.map((campaign) => (
+                                                        <option key={campaign.id} value={campaign.id}>
+                                                            {campaign.name}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                {campaignsError ? <small>{campaignsError}</small> : null}
+                                            </label>
+                                        </div>
 
-                                <div className={styles.grid3}>
-                                    <label className={styles.field}>
-                                        <span>Nro. Orden</span>
-                                        <input
-                                            type="text"
-                                            placeholder={
-                                                selectedProjectId === ''
-                                                    ? 'Seleccioná un proyecto primero'
-                                                    : 'Ej: D-8'
-                                            }
-                                            value={workOrderNumber}
-                                            onChange={(event) => {
-                                                setWorkOrderNumber(event.target.value)
-                                                setNumberPreviewError(null)
-                                            }}
-                                            onBlur={handleNumberBlur}
-                                            disabled={selectedProjectId === ''}
-                                        />
-                                        {numberPreviewError ? <small>{numberPreviewError}</small> : null}
-                                    </label>
-                                    <label className={styles.field}>
-                                        <span>Fecha</span>
-                                        <input
-                                            type="date"
-                                            value={workOrderDate}
-                                            onChange={(event) => {
-                                                setWorkOrderDate(event.target.value)
-                                            }}
-                                        />
-                                    </label>
-                                </div>
-                            </div>
-
-                            <div className="wof-stepActions is-end">
-                                <button type="button" className={styles.primaryBtn} onClick={goToNextStep}>
-                                    Continuar
-                                </button>
-                            </div>
-                        </div>
-                        <div className="wof-stepPanel" hidden={currentStep !== 2}>
-                            <div className="wof-stepCard">
-                                <div className="wof-panelHeader">
-                                    <span className="wof-panelIcon" aria-hidden="true">
-                                        <Sprout />
-                                    </span>
-                                    <h2>Campo y labor</h2>
-                                </div>
-                                <div className="wof-workGrid">
-                                    <label className={`${styles.field} wof-workField`}>
-                                        <span>Campo</span>
-                                        <select
-                                            value={selectedFieldId}
-                                            onChange={(event) => {
-                                                const value = event.target.value
-                                                setSelectedFieldId(value ? Number(value) : '')
-                                            }}
-                                            disabled={!selectedProjectId || isLoadingProjectDetail || !!projectDetailError}
-                                        >
-                                            <option value="" disabled>
-                                                Seleccionar...
-                                            </option>
-
-                                            {(selectedProjectDetail?.fields ?? []).map((field) => (
-                                                <option key={field.id} value={field.id}>
-                                                    {field.name}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        {projectDetailError ? <small>{projectDetailError}</small> : null}
-                                    </label>
-
-                                    <LotSelectorDropdown
-                                        lotSelectorRef={lotSelectorRef}
-                                        selectedFieldId={selectedFieldId}
-                                        uniqueLotNames={uniqueLotNames}
-                                        isLotSelectorOpen={isLotSelectorOpen}
-                                        setIsLotSelectorOpen={setIsLotSelectorOpen}
-                                        availableLots={availableLots}
-                                        selectedLots={selectedLots}
-                                        handleToggleLot={handleToggleLot}
-                                    />
-
-                                    <div className={`${styles.field} wof-fixedField wof-summaryLots`}>
-                                        <span>Lotes / superficie</span>
-
-                                        {selectedLots.length > 0 ? (
-                                            <div className="wof-lotAreaEditorCompact">
-                                                {selectedLots.map((lot) => (
-                                                    <label key={lot.rowId} className="wof-lotAreaChip">
-                                                        <span className="wof-lotAreaChipName">{lot.lot_name}</span>
-                                                        <input
-                                                            type="text"
-                                                            inputMode="decimal"
-                                                            value={lot.effective_area}
-                                                            onChange={(event) =>
-                                                                handleUpdateLotArea(lot.lot_id, event.target.value)
-                                                            }
-                                                        />
-                                                    </label>
-                                                ))}
-                                            </div>
-                                        ) : (
-                                            <div className="wof-lotAreaEmpty">Sin lotes seleccionados</div>
-                                        )}
+                                        <div className={styles.grid3}>
+                                            <label className={styles.field}>
+                                                <span>Nro. Orden</span>
+                                                <input
+                                                    type="text"
+                                                    placeholder={
+                                                        selectedProjectId === ''
+                                                            ? 'Seleccioná un proyecto primero'
+                                                            : 'Ej: D-8'
+                                                    }
+                                                    value={workOrderNumber}
+                                                    onChange={(event) => {
+                                                        setWorkOrderNumber(event.target.value)
+                                                        setNumberPreviewError(null)
+                                                    }}
+                                                    onBlur={handleNumberBlur}
+                                                    disabled={selectedProjectId === ''}
+                                                />
+                                                {numberPreviewError ? <small>{numberPreviewError}</small> : null}
+                                            </label>
+                                            <label className={styles.field}>
+                                                <span>Fecha</span>
+                                                <input
+                                                    type="date"
+                                                    value={workOrderDate}
+                                                    onChange={(event) => {
+                                                        setWorkOrderDate(event.target.value)
+                                                    }}
+                                                />
+                                            </label>
+                                        </div>
                                     </div>
 
-                                    <label className={`${styles.field} wof-fixedField wof-summaryCultures`}>
-                                        <span>Cultivos seleccionados</span>
-                                        <input
-                                            type="text"
-                                            value={uniqueCropNames.join(', ')}
-                                            placeholder="Se completa según los lotes elegidos"
-                                            readOnly
-                                        />
-                                    </label>
-
-                                    <label className={`${styles.field} wof-fixedField wof-summarySurface`}>
-                                        <span>Superficie realizada</span>
-                                        <input
-                                            type="text"
-                                            value={formatCalculatedDecimal(totalEffectiveArea)}
-                                            placeholder="Se suma automáticamente"
-                                            readOnly
-                                        />
-                                    </label>
-
-                                    <label className={`${styles.field} wof-fixedField wof-summaryLabor`}>
-                                        <span>Labor</span>
-                                        <select
-                                            value={selectedLaborId}
-                                            onChange={(event) => {
-                                                const value = event.target.value
-                                                const laborId = value ? Number(value) : ''
-                                                const labor = labors.find((item) => item.id === Number(value)) ?? null
-
-                                                setSelectedLaborId(laborId)
-                                                setContractor(labor?.contractor_name ?? '')
-                                            }}
-                                            disabled={selectedProjectId === '' || isLoadingLabors || !!laborsError}
-                                        >
-                                            <option value="" disabled>
-                                                Seleccionar...
-                                            </option>
-
-                                            {labors.map((labor) => (
-                                                <option key={labor.id} value={labor.id}>
-                                                    {labor.name}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        {laborsError ? <small>{laborsError}</small> : null}
-                                    </label>
-
-                                    <label className={`${styles.field} wof-fixedField wof-summaryContractor`}>
-                                        <span>Contratista</span>
-                                        <input
-                                            type="text"
-                                            value={contractor}
-                                            placeholder="Se completa automaticamente"
-                                            readOnly
-                                        />
-                                    </label>
+                                    <div className="wof-stepActions is-end">
+                                        <button type="button" className={styles.primaryBtn} onClick={goToNextStep}>
+                                            Continuar
+                                        </button>
+                                    </div>
                                 </div>
+                                <div className="wof-stepPanel" hidden={currentStep !== 2}>
+                                    <div className="wof-stepCard">
+                                        <div className="wof-panelHeader">
+                                            <span className="wof-panelIcon" aria-hidden="true">
+                                                <Sprout />
+                                            </span>
+                                            <h2>Campo y labor</h2>
+                                        </div>
+                                        <div className="wof-workGrid">
+                                            <label className={`${styles.field} wof-workField`}>
+                                                <span>Campo</span>
+                                                <select
+                                                    value={selectedFieldId}
+                                                    onChange={(event) => {
+                                                        const value = event.target.value
+                                                        setSelectedFieldId(value ? Number(value) : '')
+                                                    }}
+                                                    disabled={!selectedProjectId || isLoadingProjectDetail || !!projectDetailError}
+                                                >
+                                                    <option value="" disabled>
+                                                        Seleccionar...
+                                                    </option>
 
+                                                    {(selectedProjectDetail?.fields ?? []).map((field) => (
+                                                        <option key={field.id} value={field.id}>
+                                                            {field.name}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                {projectDetailError ? <small>{projectDetailError}</small> : null}
+                                            </label>
 
-                                <InvestorSplitSection
-                                    splitContribution={splitContribution}
-                                    setSplitContribution={setSplitContribution}
-                                    selectedInvestorId={selectedInvestorId}
-                                    setSelectedInvestorId={setSelectedInvestorId}
-                                    investorSplits={investorSplits}
-                                    setInvestorSplits={setInvestorSplits}
-                                    projectInvestors={projectInvestors}
-                                    selectedProjectId={selectedProjectId}
-                                />
-                            </div>
+                                            <LotSelectorDropdown
+                                                lotSelectorRef={lotSelectorRef}
+                                                selectedFieldId={selectedFieldId}
+                                                uniqueLotNames={uniqueLotNames}
+                                                isLotSelectorOpen={isLotSelectorOpen}
+                                                setIsLotSelectorOpen={setIsLotSelectorOpen}
+                                                availableLots={availableLots}
+                                                selectedLots={selectedLots}
+                                                handleToggleLot={handleToggleLot}
+                                            />
 
-                            <div className="wof-stepActions">
-                                <button type="button" className={styles.secondaryBtn} onClick={goToPreviousStep}>
-                                    Volver atrás
-                                </button>
+                                            <div className={`${styles.field} wof-fixedField wof-summaryLots`}>
+                                                <span>Lotes / superficie</span>
 
-                                <button type="button" className={styles.primaryBtn} onClick={goToNextStep}>
-                                    Continuar
-                                </button>
-                            </div>
-                        </div>
+                                                {selectedLots.length > 0 ? (
+                                                    <div className="wof-lotAreaEditorCompact">
+                                                        {selectedLots.map((lot) => (
+                                                            <label key={lot.rowId} className="wof-lotAreaChip">
+                                                                <span className="wof-lotAreaChipName">{lot.lot_name}</span>
+                                                                <input
+                                                                    type="text"
+                                                                    inputMode="decimal"
+                                                                    value={lot.effective_area}
+                                                                    onChange={(event) =>
+                                                                        handleUpdateLotArea(lot.lot_id, event.target.value)
+                                                                    }
+                                                                />
+                                                            </label>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <div className="wof-lotAreaEmpty">Sin lotes seleccionados</div>
+                                                )}
+                                            </div>
 
-                        <div className="wof-stepPanel" hidden={currentStep !== 3}>
-                            <div className="wof-stepCard">
-                                <div className="wof-panelHeader">
-                                    <span className="wof-panelIcon" aria-hidden="true">
-                                        <ClipboardList />
-                                    </span>
-                                    <h2>Carga de insumos</h2>
+                                            <label className={`${styles.field} wof-fixedField wof-summaryCultures`}>
+                                                <span>Cultivos seleccionados</span>
+                                                <input
+                                                    type="text"
+                                                    value={uniqueCropNames.join(', ')}
+                                                    placeholder="Se completa según los lotes elegidos"
+                                                    readOnly
+                                                />
+                                            </label>
+
+                                            <label className={`${styles.field} wof-fixedField wof-summarySurface`}>
+                                                <span>Superficie realizada</span>
+                                                <input
+                                                    type="text"
+                                                    value={formatCalculatedDecimal(totalEffectiveArea)}
+                                                    placeholder="Se suma automáticamente"
+                                                    readOnly
+                                                />
+                                            </label>
+
+                                            <div className={`${styles.field} wof-fixedField wof-summaryLabor`}>
+                                                <span>Labor</span>
+                                                <LaborSelector
+                                                    labors={labors}
+                                                    selectedLaborId={selectedLaborId}
+                                                    selectedLaborName={labors.find((l) => l.id === selectedLaborId)?.name ?? ''}
+                                                    isOpen={isLaborSelectorOpen}
+                                                    onOpen={() => setIsLaborSelectorOpen(true)}
+                                                    onClose={() => { setIsLaborSelectorOpen(false); setIsCreatingLaborOpen(false) }}
+                                                    onSelect={(labor) => {
+                                                        setSelectedLaborId(labor.id)
+                                                        setContractor(labor.contractor_name ?? '')
+                                                        setIsLaborSelectorOpen(false)
+                                                        setIsCreatingLaborOpen(false)
+                                                    }}
+                                                    search={laborSearch}
+                                                    onSearchChange={setLaborSearch}
+                                                    isPendingCreatorOpen={isCreatingLaborOpen}
+                                                    onOpenCreator={handleOpenLaborCreator}
+                                                    onCloseCreator={handleCloseLaborCreator}
+                                                    pendingName={newLaborName}
+                                                    onPendingNameChange={setNewLaborName}
+                                                    onCreatePending={handleCreatePendingLabor}
+                                                    isCreating={isSavingLabor}
+                                                    pendingError={laborCreateError}
+                                                    isLoading={isLoadingLabors}
+                                                    error={laborsError}
+                                                    selectedProjectId={selectedProjectId}
+                                                />
+                                                {laborsError ? <small>{laborsError}</small> : null}
+                                            </div>
+                                            <label className={`${styles.field} wof-fixedField wof-summaryContractor`}>
+                                                <span>Contratista</span>
+                                                <input
+                                                    type="text"
+                                                    value={contractor}
+                                                    placeholder={
+                                                        labors.find((l) => l.id === selectedLaborId)?.is_pending
+                                                            ? ' Pendiente de asignación '
+                                                            : 'Se completa automáticamente'
+                                                    }
+                                                    readOnly
+                                                />
+                                            </label>
+                                        </div>
+                                        <InvestorSplitSection
+                                            splitContribution={splitContribution}
+                                            setSplitContribution={setSplitContribution}
+                                            selectedInvestorId={selectedInvestorId}
+                                            setSelectedInvestorId={setSelectedInvestorId}
+                                            investorSplits={investorSplits}
+                                            setInvestorSplits={setInvestorSplits}
+                                            projectInvestors={projectInvestors}
+                                            selectedProjectId={selectedProjectId}
+                                        />
+                                    </div>
+                                    <div className="wof-stepActions">
+                                        <button type="button" className={styles.secondaryBtn} onClick={goToPreviousStep}>
+                                            Volver atrás
+                                        </button>
+
+                                        <button type="button" className={styles.primaryBtn} onClick={goToNextStep}>
+                                            Continuar
+                                        </button>
+                                    </div>
                                 </div>
-                                <SupplyRowsTable
-                                    supplyRows={supplyRows}
-                                    suppliesError={suppliesError}
-                                    selectedProjectId={selectedProjectId}
-                                    isLoadingSupplies={isLoadingSupplies}
-                                    availableSupplies={availableSupplies}
-                                    supplySearchByRow={supplySearchByRow}
-                                    setSupplySearchByRow={setSupplySearchByRow}
-                                    openSupplySelectorRowId={openSupplySelectorRowId}
-                                    onOpenSelector={handleOpenSupplySelector}
-                                    onCloseSelector={handleCloseSupplySelector}
-                                    setPendingSupplyName={setPendingSupplyName}
-                                    setPendingSupplyError={setPendingSupplyError}
-                                    onSelectSupply={handleSelectSupply}
-                                    pendingSupplyRowId={pendingSupplyRowId}
-                                    pendingSupplyName={pendingSupplyName}
-                                    isCreatingPendingSupply={isCreatingPendingSupply}
-                                    onOpenPendingCreator={handleOpenPendingSupplyCreator}
-                                    onClosePendingCreator={handleClosePendingSupplyCreator}
-                                    onCreatePendingSupply={handleCreatePendingSupply}
-                                    pendingSupplyError={pendingSupplyError}
-                                    updateSupplyRowFromFinalDose={updateSupplyRowFromFinalDose}
-                                    updateSupplyRowFromTotalUsed={updateSupplyRowFromTotalUsed}
-                                    onRemoveSupplyRow={handleRemoveSupplyRow}
-                                    onAddSupplyRow={handleAddSupplyRow}
-                                />
-                                <label className={`${styles.field} wof-observationsField`}>
-                                    <span>Observaciones</span>
-                                    <textarea
-                                        placeholder="Escriba observaciones"
-                                        rows={4}
-                                        value={observations}
-                                        onChange={(event) => {
-                                            setObservations(event.target.value)
-                                        }}
-                                    />
-                                </label>
-                            </div>
-                            <div className={`${styles.footerActions} wof-finalActions`}>
-                                <button type="button" className={styles.secondaryBtn} onClick={goToPreviousStep}>
-                                    Volver atrás
-                                </button>
-                                {createdDrafts.length > 0 ? (
-                                    <>
+                                <div className="wof-stepPanel" hidden={currentStep !== 3}>
+                                    <div className="wof-stepCard">
+                                        <div className="wof-panelHeader">
+                                            <span className="wof-panelIcon" aria-hidden="true">
+                                                <ClipboardList />
+                                            </span>
+                                            <h2>Carga de insumos</h2>
+                                        </div>
+                                        <SupplyRowsTable
+                                            supplyRows={supplyRows}
+                                            suppliesError={suppliesError}
+                                            selectedProjectId={selectedProjectId}
+                                            isLoadingSupplies={isLoadingSupplies}
+                                            availableSupplies={availableSupplies}
+                                            supplySearchByRow={supplySearchByRow}
+                                            setSupplySearchByRow={setSupplySearchByRow}
+                                            openSupplySelectorRowId={openSupplySelectorRowId}
+                                            onOpenSelector={handleOpenSupplySelector}
+                                            onCloseSelector={handleCloseSupplySelector}
+                                            setPendingSupplyName={setPendingSupplyName}
+                                            setPendingSupplyError={setPendingSupplyError}
+                                            onSelectSupply={handleSelectSupply}
+                                            pendingSupplyRowId={pendingSupplyRowId}
+                                            pendingSupplyName={pendingSupplyName}
+                                            isCreatingPendingSupply={isCreatingPendingSupply}
+                                            onOpenPendingCreator={handleOpenPendingSupplyCreator}
+                                            onClosePendingCreator={handleClosePendingSupplyCreator}
+                                            onCreatePendingSupply={handleCreatePendingSupply}
+                                            pendingSupplyError={pendingSupplyError}
+                                            updateSupplyRowFromFinalDose={updateSupplyRowFromFinalDose}
+                                            updateSupplyRowFromTotalUsed={updateSupplyRowFromTotalUsed}
+                                            onRemoveSupplyRow={handleRemoveSupplyRow}
+                                            onAddSupplyRow={handleAddSupplyRow}
+                                        />
+                                        <label className={`${styles.field} wof-observationsField`}>
+                                            <span>Observaciones</span>
+                                            <textarea
+                                                placeholder="Escriba observaciones"
+                                                rows={4}
+                                                value={observations}
+                                                onChange={(event) => {
+                                                    setObservations(event.target.value)
+                                                }}
+                                            />
+                                        </label>
+                                    </div>
+                                    <div className={`${styles.footerActions} wof-finalActions`}>
+                                        <button type="button" className={styles.secondaryBtn} onClick={goToPreviousStep}>
+                                            Volver atrás
+                                        </button>
+                                        {createdDrafts.length > 0 ? (
+                                            <>
+                                                <button
+                                                    type="button"
+                                                    className={styles.secondaryBtn}
+                                                    onClick={handleShareGroupPdf}
+                                                    disabled={isDownloadingGroupPdf}
+                                                >
+                                                    {isDownloadingGroupPdf ? 'Preparando PDF...' : 'Compartir PDF'}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className={styles.secondaryBtn}
+                                                    onClick={handleDownloadCreatedPdf}
+                                                    disabled={isDownloadingGroupPdf}
+                                                >
+                                                    {isDownloadingGroupPdf ? 'Descargando PDF...' : 'Descargar PDF'}
+                                                </button>
+                                            </>
+                                        ) : null}
                                         <button
                                             type="button"
-                                            className={styles.secondaryBtn}
-                                            onClick={handleShareGroupPdf}
-                                            disabled={isDownloadingGroupPdf}
+                                            className={styles.primaryBtn}
+                                            onClick={handleSaveBatchDraft}
+                                            disabled={isSavingDraft}
                                         >
-                                            {isDownloadingGroupPdf ? 'Preparando PDF...' : 'Compartir PDF'}
+                                            {isSavingDraft ? 'Guardando...' : 'Guardar borradores'}
                                         </button>
-                                        <button
-                                            type="button"
-                                            className={styles.secondaryBtn}
-                                            onClick={handleDownloadCreatedPdf}
-                                            disabled={isDownloadingGroupPdf}
-                                        >
-                                            {isDownloadingGroupPdf ? 'Descargando PDF...' : 'Descargar PDF'}
-                                        </button>
-                                    </>
-                                ) : null}
-                                <button
-                                    type="button"
-                                    className={styles.primaryBtn}
-                                    onClick={handleSaveBatchDraft}
-                                    disabled={isSavingDraft}
-                                >
-                                    {isSavingDraft ? 'Guardando...' : 'Guardar borradores'}
-                                </button>
-                            </div>
-                        </div>
-                    </fieldset>
-                </form>
+                                    </div>
+                                </div>
+                            </fieldset>
+                        </form>
+                    </>
             </div>
         </div>
     )

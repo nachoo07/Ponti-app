@@ -305,6 +305,7 @@ export function useWorkOrderWorkspace({
     isLoadingProjectDetail,
     projectDetailError,
     labors,
+    setLabors,
     isLoadingLabors,
     laborsError,
     resetWorkspaceSelection,

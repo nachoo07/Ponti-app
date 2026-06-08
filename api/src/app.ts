@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { logger } from './logger.js'
 import authRoutes from './routes/auth.js'
 import campaignsRoutes from './routes/campaigns.js'
+import categoriesRoutes from './routes/categories.js'
 import customersRoutes from './routes/customers.js'
 import laborsRoutes from './routes/labors.js'
 import projectsRoutes from './routes/projects.js'
@@ -26,14 +27,16 @@ export function createApp() {
     const startedAt = Date.now()
 
     res.on('finish', () => {
-      // No logueamos /health para no ensuciar (lo pega el healthcheck de Cloud Run).
-      if (req.path === '/health') {
+      // Solo logueamos llamadas a la API; evitamos los assets estáticos del SPA,
+      // el catch-all del index y el /health (lo pega el healthcheck de Cloud Run).
+      if (!req.path.startsWith('/api/v1')) {
         return
       }
 
       logger.info('http_request', {
         method: req.method,
-        path: req.originalUrl,
+        // req.path no incluye query string (evita loguear params sensibles a futuro).
+        path: req.path,
         status: res.statusCode,
         durationMs: Date.now() - startedAt,
       })
@@ -61,6 +64,7 @@ export function createApp() {
 
   app.use('/api/v1/auth', authRoutes)
   app.use('/api/v1/campaigns', campaignsRoutes)
+  app.use('/api/v1/categories', categoriesRoutes)
   app.use('/api/v1/customers', customersRoutes)
   app.use('/api/v1/labors', laborsRoutes)
   app.use('/api/v1/projects', projectsRoutes)

@@ -75,3 +75,10 @@ export function buildSelectedLotFormRow(lot: Lot): BatchSelectedLotFormRow {
     }
 }
 
+export function insertSortedById<T extends { id: number; name: string }>(list: T[], item: T): T[] {
+    if (list.some((existing) => existing.id === item.id)) {
+        return list
+    }
+    return [...list, item].sort((a, b) => a.name.localeCompare(b.name))
+}
+

@@ -9,7 +9,10 @@ services:
     environment:
       NODE_ENV: production
     env_file:
-      - api/.env
+      # required: false → no falla en un clone limpio donde api/.env no existe
+      # (las vars pueden venir por `environment` o por el entorno del host).
+      - path: api/.env
+        required: false
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped

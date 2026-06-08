@@ -761,6 +761,33 @@
   cursor: pointer;
 }
 
+/* Creador inline de labor: vive bajo el campo Labor (no dentro de un popover),
+   por eso ocupa toda la fila del summaryGrid y usa su propio botón sin los
+   bordes del popover de insumos. */
+.wof-laborCreate {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.wof-laborCreateAction {
+  justify-self: start;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+  color: var(--color-primary-dark);
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.wof-laborCreateAction:hover {
+  background: var(--color-surface-hover);
+}
+
 .wof-supplyOptionList {
   max-height: 240px;
   overflow-y: auto;
@@ -816,12 +843,6 @@
   border: 1px solid transparent;
 }
 
-.wof-toast.is-success {
-  background: var(--color-success-light);
-  border-color: rgba(16, 185, 129, 0.16);
-  color: var(--color-accent-dark);
-}
-
 .wof-toast.is-error {
   background: var(--color-danger-light);
   border-color: rgba(220, 38, 38, 0.14);
@@ -850,6 +871,62 @@
   font-size: 1.2rem;
   line-height: 1;
   cursor: pointer;
+}
+
+.wof-confirmation {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 14px;
+  padding: 48px 24px;
+}
+
+.wof-confirmationIcon {
+  display: grid;
+  place-items: center;
+  width: 96px;
+  height: 96px;
+  border-radius: var(--radius-full);
+  background: var(--color-success-light);
+  font-size: 52px;
+  line-height: 1;
+}
+
+.wof-confirmationTitle {
+  margin: 0;
+  font-size: 1.5rem;
+  color: var(--color-accent-dark);
+  outline: none;
+}
+
+.wof-confirmationSubtitle {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.98rem;
+}
+
+.wof-confirmationActions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 320px;
+  margin-top: 8px;
+}
+
+.wof-confirmationSecondary {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+  max-width: 320px;
+  margin-top: 8px;
+  padding-top: 20px;
+  border-top: 1px solid var(--color-border-light);
+}
+
+.wof-confirmationSecondary > * {
+  flex: 1;
 }
 
 @media (min-width: 640px) {
@@ -1051,6 +1128,19 @@
   .wof-stepActions .wof-primaryBtn,
   .wof-stepActions .wof-secondaryBtn {
     width: 100%;
+  }
+
+  .wof-confirmation {
+    padding: 36px 8px;
+  }
+
+  .wof-confirmationActions,
+  .wof-confirmationSecondary {
+    max-width: none;
+  }
+
+  .wof-confirmationSecondary {
+    flex-direction: column;
   }
 
   .wof-toast {

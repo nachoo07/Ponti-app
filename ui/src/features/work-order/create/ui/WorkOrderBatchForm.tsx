@@ -902,13 +902,6 @@ export function WorkOrderBatchForm() {
 
     }
 
-    function handleCreateNewOrder() {
-        setCreatedDrafts([])
-        setGroupPdfError(null)
-        resetFormAfterCreate()
-        scrollToFormTop()
-    }
-
     function handleGoHome() {
         navigate('/home')
     }

@@ -326,15 +326,6 @@ export function WorkOrderForm({
 
   const projectInvestors = selectedProjectDetail?.investors ?? []
 
-  function getSupplyLabel(row: SupplyRow): string {
-    const matchedSupply =
-      row.supply_id === ''
-        ? null
-        : supplies.find((supply) => supply.id === row.supply_id) ?? null
-
-    return row.supply_name?.trim() || matchedSupply?.name || ''
-  }
-
   function handleNumberBlur() {
     if (selectedProjectId === '') return
 

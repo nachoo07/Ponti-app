@@ -44,6 +44,9 @@
   `labors.is_pending` from migration `000232_labor_pending_changes`; the BFF
   keeps the route stable and does not substitute grouped work-order history.
 - All `/api/v1/work-order-drafts/**` routes are owned by `Work Orders`.
+- `POST /api/v1/work-order-drafts/digital/batch` forwards item `total_used` as
+  the total consumption of the logical OT. Mobile must not divide consumption by
+  lot; Core distributes it proportionally across physical `D-n.x` drafts.
 - Health/version are owned by `Platform & Delivery`.
 
 ## Non-Canonical Client Paths

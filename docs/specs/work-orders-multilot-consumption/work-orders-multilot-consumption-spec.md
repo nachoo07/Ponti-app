@@ -4,13 +4,14 @@
 |---|---|
 | Feature | `work-orders-multilot-consumption` |
 | Dominio canonico | `Work Orders` |
-| Estado canonico | Regression test |
+| Estado canonico | Implemented regression coverage |
 | Ultima normalizacion | 2026-06-08 |
 
 ## Proposito
 
-Reproducir el bug donde una OT digital batch creada desde mobile con mas de un
-lote duplica el consumo de insumos al persistir una suborden por lote.
+Cubrir el flujo donde una OT digital batch creada desde mobile con mas de un
+lote persiste una suborden fisica por lote sin duplicar el consumo total de
+insumos.
 
 ## Regla esperada
 
@@ -24,18 +25,29 @@ Ejemplo canonico:
 - Lote B: `50 ha`
 - Insumo total cargado: `200`
 - Consumo total esperado del grupo: `200`
-- Bug actual reproducido: `200 + 200 = 400`
+- Persistencia esperada: `100 + 100 = 200`
+
+Core valida que todos los lotes compartan el mismo set de insumos, calcula
+`final_dose = total_used / superficie_total`, distribuye `total_used` por area
+efectiva de lote y ajusta el ultimo lote por residuo decimal.
+
+Mobile sigue enviando `total_used` como consumo total de la OT. No debe
+predividirlo por lote.
 
 ## Evidencia automatizada
 
 - `ui/e2e/work-orders-multilot-consumption.spec.ts`
 
 El test crea un batch digital con dos lotes y espera que la suma de
-`items[].total_used` de las subordenes creadas sea `200`. Hasta corregir Core,
-el test debe fallar observando `400`.
+`items[].total_used` de las subordenes creadas sea `200`.
+
+Validacion 2026-06-08:
+
+- `npm run test:e2e -- work-orders-multilot-consumption.spec.ts`: passed.
 
 ## No alcance
 
 - No cambia el modelo de datos.
 - No publica la OT.
-- No corrige todavia la persistencia proporcional por lote.
+- No introduce una entidad multi-lote real; se mantiene compatibilidad con
+  subordenes fisicas por lote.

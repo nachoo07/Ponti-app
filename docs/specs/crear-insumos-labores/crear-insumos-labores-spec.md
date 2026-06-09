@@ -95,8 +95,8 @@ No incluye:
   el `500 failed to list labor`.
 - `GET /api/v1/projects/30/labors` despues de `000232`: `200`, 19 filas,
   contrato `{ data, page_info }`.
-- Mobile validation: `api npm test`, `api npm run build`, `ui npm ci`,
-  `ui npm run lint`, `ui npm run build`, `ui npm test`, `ui npm run test:e2e`.
+- Mobile validation: `cd api && npm test`, `cd ui && npm test`,
+  `cd ui && npm run test:e2e -- work-orders-labors.spec.ts`.
 
 ## UNKNOWN justificados
 

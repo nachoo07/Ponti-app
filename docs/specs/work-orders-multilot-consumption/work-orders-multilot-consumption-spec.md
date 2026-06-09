@@ -43,6 +43,8 @@ El test crea un batch digital con dos lotes y espera que la suma de
 
 Validacion 2026-06-08:
 
+- `cd api && npm test`: passed.
+- `cd ui && npm test`: passed.
 - `npm run test:e2e -- work-orders-multilot-consumption.spec.ts`: passed.
 
 ## No alcance

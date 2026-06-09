@@ -1,11 +1,11 @@
 # Work Orders Multi-Lote: Consumo Total
 
-| Campo | Valor |
-|---|---|
-| Feature | `work-orders-multilot-consumption` |
-| Dominio canonico | `Work Orders` |
-| Estado canonico | Implemented regression coverage |
-| Ultima normalizacion | 2026-06-08 |
+| Campo                | Valor                              |
+| -------------------- | ---------------------------------- |
+| Feature              | `work-orders-multilot-consumption` |
+| Dominio canonico     | `Work Orders`                      |
+| Estado canonico      | Implemented regression coverage    |
+| Ultima normalizacion | 2026-06-08                         |
 
 ## Proposito
 
@@ -39,7 +39,13 @@ predividirlo por lote.
 - `ui/e2e/work-orders-multilot-consumption.spec.ts`
 
 El test crea un batch digital con dos lotes y espera que la suma de
-`items[].total_used` de las subordenes creadas sea `200`.
+`items[].total_used` de las subordenes creadas sea `200`. Tambien valida por
+detalle que cada suborden guarde `total_used_lote = final_dose * effective_area`.
+
+El spec incluye un smoke read-only contra datos guardados. Si existen las
+subordenes `D-1905555.1`, `D-1905555.2`, y `D-1905555.3` en la DB activa,
+Mobile debe poder leerlas por BFF y sus detalles deben conservar
+`final_dose=10` y `total_used` `2010`, `350`, y `2500`.
 
 Validacion 2026-06-08:
 

@@ -7,6 +7,8 @@ const PROJECT_ID = 30
 const FALLBACK_CUSTOMER_ID = 17
 const EXPECTED_TOTAL_USED = 200
 const LOT_AREA = '50'
+const STORED_BASE_NUMBER = 'D-1905555'
+const STORED_EXPECTED_TOTAL_USED = 4860
 
 type ProjectDetail = {
   id: number
@@ -47,11 +49,17 @@ type BatchCreateItem = {
 type DraftDetail = {
   id: number
   number: string
+  effective_area: string | number
   items?: Array<{
     supply_id: number
     total_used: string | number
     final_dose: string | number
   }>
+}
+
+type DraftListItem = {
+  id: number
+  number: string
 }
 
 function base64Url(value: unknown): string {
@@ -78,8 +86,10 @@ function createE2EToken(): string {
 function parseEnvFile(filePath: string): Record<string, string> {
   if (!fs.existsSync(filePath)) return {}
 
-  return fs.readFileSync(filePath, 'utf8').split(/\r?\n/).reduce<Record<string, string>>(
-    (env, line) => {
+  return fs
+    .readFileSync(filePath, 'utf8')
+    .split(/\r?\n/)
+    .reduce<Record<string, string>>((env, line) => {
       const trimmed = line.trim()
       if (!trimmed || trimmed.startsWith('#')) return env
 
@@ -90,9 +100,7 @@ function parseEnvFile(filePath: string): Record<string, string> {
       const rawValue = trimmed.slice(separatorIndex + 1).trim()
       env[key] = rawValue.replace(/^['"]|['"]$/g, '')
       return env
-    },
-    {},
-  )
+    }, {})
 }
 
 function getLocalEnv(name: string): string {
@@ -101,9 +109,7 @@ function getLocalEnv(name: string): string {
 }
 
 function getManagerApiConfig() {
-  const baseURL = getLocalEnv('BASE_MANAGER_API')
-    .replace('host.docker.internal', '127.0.0.1')
-    .replace(/\/+$/, '')
+  const baseURL = getLocalEnv('BASE_MANAGER_API').replace('host.docker.internal', '127.0.0.1').replace(/\/+$/, '')
   const apiKey = getLocalEnv('X_API_KEY')
 
   if (!baseURL || !apiKey) {
@@ -145,11 +151,7 @@ async function getJson<T>(request: APIRequestContext, pathName: string, token: s
   return response.json() as Promise<T>
 }
 
-async function deleteDrafts(
-  request: APIRequestContext,
-  draftIds: number[],
-  token: string,
-) {
+async function deleteDrafts(request: APIRequestContext, draftIds: number[], token: string) {
   const config = getManagerApiConfig()
   if (!config) return
 
@@ -168,8 +170,7 @@ async function resolveFixture(request: APIRequestContext, token: string) {
   const fields = Array.isArray(project.fields) ? project.fields : []
   const field = fields.find(
     (candidate) =>
-      Array.isArray(candidate.lots) &&
-      candidate.lots.filter((lot) => Number(lot.current_crop_id) > 0).length >= 2,
+      Array.isArray(candidate.lots) && candidate.lots.filter((lot) => Number(lot.current_crop_id) > 0).length >= 2,
   )
   const lots = (field?.lots ?? []).filter((lot) => Number(lot.current_crop_id) > 0).slice(0, 2)
 
@@ -236,20 +237,17 @@ test('batch multi-lote guarda consumo total una sola vez', async ({ request }) =
     })
 
     const createBody = await response.text()
-    expect(
-      response.ok(),
-      `POST batch respondio ${response.status()}: ${createBody}`,
-    ).toBeTruthy()
+    expect(response.ok(), `POST batch respondio ${response.status()}: ${createBody}`).toBeTruthy()
 
-    const createPayload = JSON.parse(createBody) as { items?: BatchCreateItem[] }
+    const createPayload = JSON.parse(createBody) as {
+      items?: BatchCreateItem[]
+    }
     const createdItems = createPayload.items ?? []
     expect(createdItems).toHaveLength(2)
     createdDraftIds.push(...createdItems.map((item) => item.id))
 
     const details = await Promise.all(
-      createdItems.map((item) =>
-        getJson<DraftDetail>(request, `/work-order-drafts/${item.id}`, token),
-      ),
+      createdItems.map((item) => getJson<DraftDetail>(request, `/work-order-drafts/${item.id}`, token)),
     )
 
     const observedTotalUsed = details.reduce((total, draft) => {
@@ -258,7 +256,65 @@ test('batch multi-lote guarda consumo total una sola vez', async ({ request }) =
     }, 0)
 
     expect(observedTotalUsed).toBeCloseTo(EXPECTED_TOTAL_USED, 5)
+
+    for (const draft of details) {
+      const matchingItem = draft.items?.find((item) => item.supply_id === fixture.supply!.id)
+      expect(matchingItem, `${draft.number} debe tener el insumo creado`).toBeTruthy()
+      expect(Number(matchingItem?.total_used ?? 0)).toBeCloseTo(100, 5)
+      expect(Number(matchingItem?.final_dose ?? 0)).toBeCloseTo(2, 5)
+      expect(Number(matchingItem?.total_used ?? 0)).toBeCloseTo(
+        Number(matchingItem?.final_dose ?? 0) * Number(draft.effective_area),
+        5,
+      )
+    }
   } finally {
     await deleteDrafts(request, createdDraftIds, token)
   }
+})
+
+test('ordenes guardadas D-1905555 conservan consumo distribuido por detalle', async ({ request }) => {
+  const token = createE2EToken()
+  const listPayload = await getJson<unknown>(
+    request,
+    `/work-order-drafts/digital?number=${STORED_BASE_NUMBER}&page=1&per_page=20`,
+    token,
+  )
+  const rows = extractRows<DraftListItem>(listPayload)
+  const matchingRows = rows.filter(
+    (row) => row.number === STORED_BASE_NUMBER || row.number.startsWith(`${STORED_BASE_NUMBER}.`),
+  )
+
+  test.skip(matchingRows.length === 0, `La DB activa no tiene ${STORED_BASE_NUMBER}.x; smoke read-only salteado`)
+
+  expect(matchingRows).toHaveLength(3)
+  expect(matchingRows.some((row) => row.number === STORED_BASE_NUMBER)).toBe(false)
+  expect(matchingRows.map((row) => row.number).sort()).toEqual([
+    `${STORED_BASE_NUMBER}.1`,
+    `${STORED_BASE_NUMBER}.2`,
+    `${STORED_BASE_NUMBER}.3`,
+  ])
+
+  const details = await Promise.all(
+    matchingRows.map((row) => getJson<DraftDetail>(request, `/work-order-drafts/${row.id}`, token)),
+  )
+  const expectedByNumber: Record<string, number> = {
+    [`${STORED_BASE_NUMBER}.1`]: 2010,
+    [`${STORED_BASE_NUMBER}.2`]: 350,
+    [`${STORED_BASE_NUMBER}.3`]: 2500,
+  }
+
+  const observedTotalUsed = details.reduce((total, draft) => {
+    const expected = expectedByNumber[draft.number]
+    expect(expected, `${draft.number} debe ser una suborden esperada`).toBeDefined()
+
+    const item = draft.items?.[0]
+    expect(item, `${draft.number} debe tener item de insumo`).toBeTruthy()
+    expect(Number(item?.total_used ?? 0)).toBeCloseTo(expected, 5)
+    expect(Number(item?.final_dose ?? 0)).toBeCloseTo(10, 5)
+    expect(Number(item?.total_used ?? 0)).toBeCloseTo(Number(item?.final_dose ?? 0) * Number(draft.effective_area), 5)
+
+    return total + Number(item?.total_used ?? 0)
+  }, 0)
+
+  expect(observedTotalUsed).toBeCloseTo(STORED_EXPECTED_TOTAL_USED, 5)
 })

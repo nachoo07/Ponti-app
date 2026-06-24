@@ -349,4 +349,50 @@ router.post('/:id/publish', async (req, res) => {
   }
 })
 
+router.delete('/:id', async (req, res) => {
+  const headers = getManagerHeaders(req)
+
+  if (!headers) {
+    res.status(401).json({ message: 'Usuario no autenticado' })
+    return
+  }
+
+  try {
+    await managerApi.delete(`/work-order-drafts/${req.params.id}`, {
+      headers,
+    })
+
+    res.status(204).send()
+  } catch (error: any) {
+    res.status(error?.response?.status ?? 500).json(
+      error?.response?.data ?? {
+        message: 'No se pudo eliminar la orden',
+      },
+    )
+  }
+})
+
+router.delete('/:id', async (req, res) => {
+  const headers = getManagerHeaders(req)
+
+  if (!headers) {
+    res.status(401).json({ message: 'Usuario no autenticado' })
+    return
+  }
+
+  try {
+    await managerApi.delete(`/work-order-drafts/${req.params.id}`, {
+      headers,
+    })
+
+    res.status(204).send()
+  } catch (error: any) {
+    res.status(error?.response?.status ?? 500).json(
+      error?.response?.data ?? {
+        message: 'No se pudo eliminar la orden',
+      },
+    )
+  }
+})
+
 export default router

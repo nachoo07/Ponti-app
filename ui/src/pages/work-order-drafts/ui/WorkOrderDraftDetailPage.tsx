@@ -1,16 +1,19 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, Download, Pencil, Share2 } from 'lucide-react'
+import { Link, useParams, useNavigate } from 'react-router-dom'
+import { ArrowLeft, Download, Pencil, Share2, Trash2 } from 'lucide-react'
 import { downloadWorkOrderDraftGroupPdf } from '../../../entities/workOrderDraft/api/downloadWorkOrderDraftGroupPdf'
 import { downloadWorkOrderDraftPdf } from '../../../entities/workOrderDraft/api/downloadWorkOrderDraftPdf'
 import { getWorkOrderDraftGroupById } from '../../../entities/workOrderDraft/api/getWorkOrderDraftGroupById'
 import { formatWorkOrderDraftStatus } from '../../../entities/workOrderDraft/model/formatWorkOrderDraftStatus'
+import { deleteWorkOrderDraft } from '../../../entities/workOrderDraft/api/deleteWorkOrderDraft'
 import type { WorkOrderDraftGroupDetail } from '../../../entities/workOrderDraft/model/workOrderDraftDetail.types'
 import { WorkOrderForm } from '../../../features/work-order/create/ui/WorkOrderForm'
 import { mapDraftToFormValues } from '../../../features/work-order/create/model/mapDraftToFormValues'
 import { ApiError } from '../../../shared/api/http'
 import { updateWorkOrderDraftGroup } from '../../../entities/workOrderDraft/api/updateWorkOrderDraftGroup'
 import type { UpdateWorkOrderDraftGroupPayload } from '../../../entities/workOrderDraft/model/workOrderDraft.types'
+import { ConfirmDialog } from '../../../shared/ui/ConfirmDialog'
+import { useRefetchOnFocus } from '../../../shared/lib/useRefetchOnFocus'
 import './WorkOrderDraftDetailPage.css'
 
 function normalizeDetailDate(value: string | null | undefined): string {
@@ -35,12 +38,15 @@ export function WorkOrderDraftDetailPage() {
   const { id } = useParams()
   const [draft, setDraft] = useState<WorkOrderDraftGroupDetail | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const navigate = useNavigate()
+  const [isDeleting, setIsDeleting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isEditing, setIsEditing] = useState(false)
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false)
   const [pdfError, setPdfError] = useState<string | null>(null)
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false)
 
   async function loadDraft(draftId: number) {
     setIsLoading(true)
@@ -77,11 +83,43 @@ export function WorkOrderDraftDetailPage() {
     void loadDraft(draftId)
   }, [id])
 
+   useRefetchOnFocus(() => {
+    if (draft && !isEditing) {
+      void loadDraft(draft.id)
+    }
+  })
+
   async function handleDraftSaved(savedDraftId: number) {
     await loadDraft(savedDraftId)
     setSaveError(null)
     setSaveFeedback('Borrador actualizado con exito.')
     setIsEditing(false)
+  }
+
+   async function handleConfirmDelete() {
+    if (!draft) return
+
+    setIsDeleting(true)
+    setSaveError(null)
+
+    try {
+      // Una orden agrupada tiene un draft por lote: borramos todos.
+      const draftIds = draft.lots?.length
+        ? draft.lots.map((lot) => lot.draft_id)
+        : [draft.id]
+
+      for (const draftId of draftIds) {
+        await deleteWorkOrderDraft(draftId)
+      }
+
+      navigate('/work-order-drafts')
+    } catch (deleteError) {
+      setSaveError(
+        deleteError instanceof Error ? deleteError.message : 'No se pudo eliminar la orden.',
+      )
+      setIsDeleting(false)
+      setIsConfirmOpen(false)
+    }
   }
 
   async function handleDownloadDraftPdf() {
@@ -230,6 +268,7 @@ export function WorkOrderDraftDetailPage() {
                 ? 'Preparando PDF...'
                 : 'Compartir PDF'}
             </button>
+
             <button
               type="button"
               className="work-order-draft-detail-editBtn"
@@ -254,6 +293,17 @@ export function WorkOrderDraftDetailPage() {
               >
                 <Pencil aria-hidden="true" />
                 {isEditing ? 'Cancelar edición' : 'Editar'}
+              </button>
+            ) : null}
+               {!isPublished ? (
+              <button
+                type="button"
+                className="work-order-draft-detail-editBtn is-danger"
+                onClick={() => setIsConfirmOpen(true)}
+                disabled={isDeleting}
+              >
+                <Trash2 aria-hidden="true" />
+                Eliminar
               </button>
             ) : null}
           </div>
@@ -451,6 +501,15 @@ export function WorkOrderDraftDetailPage() {
         )}
 
       </section>
+       <ConfirmDialog
+          open={isConfirmOpen}
+          title="Eliminar orden"
+          message="¿Eliminar esta orden? Esta acción no se puede deshacer."
+          confirmLabel="Eliminar"
+          isConfirming={isDeleting}
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setIsConfirmOpen(false)}
+        />
     </main>
   )
 }

@@ -175,6 +175,12 @@
   text-transform: uppercase;
 }
 
+.work-order-draft-detail-editBtn.is-danger {
+  border-color: rgba(239, 97, 93, 0.26);
+  background: var(--color-danger-light);
+  color: var(--color-danger);
+}
+
 .work-order-draft-detail-contextItem strong,
 .work-order-draft-detail-infoItem strong,
 .work-order-draft-detail-readonlyField strong {

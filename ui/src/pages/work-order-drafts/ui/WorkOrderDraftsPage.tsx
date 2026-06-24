@@ -2,15 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { FilePlus2, Search } from 'lucide-react'
-import {
-  getWorkOrderDrafts,
-  type GetWorkOrderDraftsResult,
-} from '../../../entities/workOrderDraft/api/getWorkOrderDrafts'
+import { getWorkOrderDrafts, type GetWorkOrderDraftsResult, } from '../../../entities/workOrderDraft/api/getWorkOrderDrafts'
 import { formatWorkOrderDraftStatus } from '../../../entities/workOrderDraft/model/formatWorkOrderDraftStatus'
-import type {
-  WorkOrderDraftListItem,
-  WorkOrderDraftListPageInfo,
-} from '../../../entities/workOrderDraft/model/workOrderDraftDetail.types'
+import type { WorkOrderDraftListItem, WorkOrderDraftListPageInfo,} from '../../../entities/workOrderDraft/model/workOrderDraftDetail.types'
 import './WorkOrderDraftsPage.css'
 
 const defaultPageInfo: WorkOrderDraftListPageInfo = {
@@ -239,30 +233,30 @@ export function WorkOrderDraftsPage() {
     }
   }, [openColumnFilter])
 
-const topFilterOptions = useMemo(() => {
-  const unique = (values: Array<string | null | undefined>) =>
-    [...new Set(values.map((value) => value?.trim()).filter(Boolean) as string[])]
-      .sort((a, b) => a.localeCompare(b))
+  const topFilterOptions = useMemo(() => {
+    const unique = (values: Array<string | null | undefined>) =>
+      [...new Set(values.map((value) => value?.trim()).filter(Boolean) as string[])]
+        .sort((a, b) => a.localeCompare(b))
 
-  const byCustomer = customerFilter
-    ? drafts.filter((d) => d.customer_name === customerFilter)
-    : drafts
+    const byCustomer = customerFilter
+      ? drafts.filter((d) => d.customer_name === customerFilter)
+      : drafts
 
-  const byCustomerAndProject = projectFilter
-    ? byCustomer.filter((d) => d.project_name === projectFilter)
-    : byCustomer
+    const byCustomerAndProject = projectFilter
+      ? byCustomer.filter((d) => d.project_name === projectFilter)
+      : byCustomer
 
-  const byCustomerProjectAndCampaign = campaignFilter
-    ? byCustomerAndProject.filter((d) => d.campaign_name === campaignFilter)
-    : byCustomerAndProject
+    const byCustomerProjectAndCampaign = campaignFilter
+      ? byCustomerAndProject.filter((d) => d.campaign_name === campaignFilter)
+      : byCustomerAndProject
 
-  return {
-    customers: unique(drafts.map((d) => d.customer_name)),
-    projects: unique(byCustomer.map((d) => d.project_name)),
-    campaigns: unique(byCustomerAndProject.map((d) => d.campaign_name)),
-    fields: unique(byCustomerProjectAndCampaign.map((d) => d.field_name)),
-  }
-}, [drafts, customerFilter, projectFilter, campaignFilter])
+    return {
+      customers: unique(drafts.map((d) => d.customer_name)),
+      projects: unique(byCustomer.map((d) => d.project_name)),
+      campaigns: unique(byCustomerAndProject.map((d) => d.campaign_name)),
+      fields: unique(byCustomerProjectAndCampaign.map((d) => d.field_name)),
+    }
+  }, [drafts, customerFilter, projectFilter, campaignFilter])
 
   const filteredDrafts = useMemo(() => {
     return drafts.filter((draft) => {
@@ -402,9 +396,8 @@ const topFilterOptions = useMemo(() => {
           <div className="work-order-drafts-columnHeaderActions">
             <button
               type="button"
-              className={`work-order-drafts-headerBtn ${
-                sortKey === key ? 'is-active' : ''
-              }`}
+              className={`work-order-drafts-headerBtn ${sortKey === key ? 'is-active' : ''
+                }`}
               onClick={() => toggleSort(key)}
               aria-label={`Ordenar columna ${label}`}
             >
@@ -414,9 +407,8 @@ const topFilterOptions = useMemo(() => {
             <button
               type="button"
               ref={(el) => { filterButtonRefs.current[key] = el }}
-              className={`work-order-drafts-headerBtn ${
-                isFilterActive || isFilterOpen ? 'is-active' : ''
-              }`}
+              className={`work-order-drafts-headerBtn ${isFilterActive || isFilterOpen ? 'is-active' : ''
+                }`}
               onClick={() => toggleColumnFilter(key)}
               aria-label={`Filtrar columna ${label}`}
             >
@@ -427,90 +419,90 @@ const topFilterOptions = useMemo(() => {
 
         {isFilterOpen && filterPopoverPosition
           ? createPortal(
-          <div
-            ref={filterPopoverRef}
-            className="work-order-drafts-filterPopover"
-            style={{ position: 'fixed', top: filterPopoverPosition.top, left: filterPopoverPosition.left }}
-          >
-            <input
-              type="text"
-              className="work-order-drafts-filterSearch"
-              placeholder="Buscar opción..."
-              value={columnFilterSearch[key]}
-              onChange={(event) => {
-                const value = event.target.value
-                setColumnFilterSearch((current) => ({
-                  ...current,
-                  [key]: value,
-                }))
-              }}
-            />
+            <div
+              ref={filterPopoverRef}
+              className="work-order-drafts-filterPopover"
+              style={{ position: 'fixed', top: filterPopoverPosition.top, left: filterPopoverPosition.left }}
+            >
+              <input
+                type="text"
+                className="work-order-drafts-filterSearch"
+                placeholder="Buscar opción..."
+                value={columnFilterSearch[key]}
+                onChange={(event) => {
+                  const value = event.target.value
+                  setColumnFilterSearch((current) => ({
+                    ...current,
+                    [key]: value,
+                  }))
+                }}
+              />
 
-            <div className="work-order-drafts-filterOptions">
-              {visibleOptions.length === 0 ? (
-                <p className="work-order-drafts-filterEmpty">No hay opciones</p>
-              ) : (
-                <>
-                  <label
-                    className="work-order-drafts-filterOption"
-                    style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: '8px' }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={allChecked}
-                      ref={(el) => { if (el) el.indeterminate = isIndeterminate }}
-                      onChange={(event) => {
-                        const checked = event.target.checked
-                        setColumnFilters((current) => ({
-                          ...current,
-                          [key]: checked
-                            ? [...new Set([...current[key], ...visibleOptions])]
-                            : current[key].filter((v) => !visibleOptions.includes(v)),
-                        }))
-                      }}
-                    />
-                    <span>Seleccionar todo</span>
-                  </label>
-                  {visibleOptions.map((option) => {
-                    const checked = columnFilters[key].includes(option)
+              <div className="work-order-drafts-filterOptions">
+                {visibleOptions.length === 0 ? (
+                  <p className="work-order-drafts-filterEmpty">No hay opciones</p>
+                ) : (
+                  <>
+                    <label
+                      className="work-order-drafts-filterOption"
+                      style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: '8px' }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={allChecked}
+                        ref={(el) => { if (el) el.indeterminate = isIndeterminate }}
+                        onChange={(event) => {
+                          const checked = event.target.checked
+                          setColumnFilters((current) => ({
+                            ...current,
+                            [key]: checked
+                              ? [...new Set([...current[key], ...visibleOptions])]
+                              : current[key].filter((v) => !visibleOptions.includes(v)),
+                          }))
+                        }}
+                      />
+                      <span>Seleccionar todo</span>
+                    </label>
+                    {visibleOptions.map((option) => {
+                      const checked = columnFilters[key].includes(option)
 
-                    return (
-                      <label key={option} className="work-order-drafts-filterOption">
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={(event) => {
-                            handleFilterChange(key, option, event.target.checked)
-                          }}
-                        />
-                        <span>{option}</span>
-                      </label>
-                    )
-                  })}
-                </>
-              )}
-            </div>
+                      return (
+                        <label key={option} className="work-order-drafts-filterOption">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(event) => {
+                              handleFilterChange(key, option, event.target.checked)
+                            }}
+                          />
+                          <span>{option}</span>
+                        </label>
+                      )
+                    })}
+                  </>
+                )}
+              </div>
 
-            <div className="work-order-drafts-filterInlineActions">
-              <button
-                type="button"
-                className="work-order-drafts-filterClearLink"
-                onClick={() => handleClearColumnFilter(key)}
-              >
-                Limpiar
-              </button>
-              <button
-                type="button"
-                className="work-order-drafts-filterApplyBtn"
-                onClick={() => { setOpenColumnFilter(null); setFilterPopoverPosition(null) }}
-              >
-                Aplicar
-              </button>
-            </div>
+              <div className="work-order-drafts-filterInlineActions">
+                <button
+                  type="button"
+                  className="work-order-drafts-filterClearLink"
+                  onClick={() => handleClearColumnFilter(key)}
+                >
+                  Limpiar
+                </button>
+                <button
+                  type="button"
+                  className="work-order-drafts-filterApplyBtn"
+                  onClick={() => { setOpenColumnFilter(null); setFilterPopoverPosition(null) }}
+                >
+                  Aplicar
+                </button>
+              </div>
 
-          </div>,
-          document.body
-        ) : null}
+            </div>,
+            document.body
+          ) : null}
       </div>
     )
   }
@@ -536,11 +528,11 @@ const topFilterOptions = useMemo(() => {
               className="work-order-drafts-select"
               value={customerFilter}
               onChange={(event) => {
-  setCustomerFilter(event.target.value)
-  setProjectFilter('')
-  setCampaignFilter('')
-  setFieldFilter('')
-}}
+                setCustomerFilter(event.target.value)
+                setProjectFilter('')
+                setCampaignFilter('')
+                setFieldFilter('')
+              }}
             >
               <option value="">Todos los clientes</option>
               {topFilterOptions.customers.map((customer) => (
@@ -555,10 +547,10 @@ const topFilterOptions = useMemo(() => {
               className="work-order-drafts-select"
               value={projectFilter}
               onChange={(event) => {
-  setProjectFilter(event.target.value)
-  setCampaignFilter('')
-  setFieldFilter('')
-}}
+                setProjectFilter(event.target.value)
+                setCampaignFilter('')
+                setFieldFilter('')
+              }}
             >
               <option value="">Todos los proyectos</option>
               {topFilterOptions.projects.map((project) => (
@@ -573,9 +565,9 @@ const topFilterOptions = useMemo(() => {
               className="work-order-drafts-select"
               value={campaignFilter}
               onChange={(event) => {
-  setCampaignFilter(event.target.value)
-  setFieldFilter('')
-}}
+                setCampaignFilter(event.target.value)
+                setFieldFilter('')
+              }}
             >
               <option value="">Todas las campañas</option>
               {topFilterOptions.campaigns.map((campaign) => (
@@ -627,10 +619,9 @@ const topFilterOptions = useMemo(() => {
             <p className="work-order-drafts-feedback">Cargando ordenes...</p>
           ) : null}
 
-                    <div
-            className={`work-order-drafts-tableWrap ${
-              isRefreshingTable ? 'is-refreshing' : ''
-            } ${openColumnFilter ? 'is-filter-open' : ''}`}
+          <div
+            className={`work-order-drafts-tableWrap ${isRefreshingTable ? 'is-refreshing' : ''
+              } ${openColumnFilter ? 'is-filter-open' : ''}`}
           >
 
             {isRefreshingTable ? (

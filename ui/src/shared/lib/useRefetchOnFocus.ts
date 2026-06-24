@@ -1,13 +1,10 @@
-import { useEffect, useRef } from 'react'
+import { useEffect } from 'react'
 
 export function useRefetchOnFocus(callback: () => void) {
-  const callbackRef = useRef(callback)
-  callbackRef.current = callback
-
   useEffect(() => {
     function handleFocus() {
       if (document.visibilityState === 'visible') {
-        callbackRef.current()
+        callback()
       }
     }
 
@@ -18,5 +15,5 @@ export function useRefetchOnFocus(callback: () => void) {
       window.removeEventListener('focus', handleFocus)
       document.removeEventListener('visibilitychange', handleFocus)
     }
-  }, [])
+  }, [callback])
 }
